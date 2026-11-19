@@ -17,8 +17,16 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 135 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 137 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current POPCNT batch
+
+Added 16/32/64-bit POPCNT register/memory forms and portable fault tests.
+Linux Debug, Release and ASan+UBSan passed 137/137 tests each; 98,304 native
+register and status-flag comparisons passed on the test CPU. Windows x64 CLI
+and portable tests cross-compiled, but were not run. This is not a CPUID model
+or evidence of PS5/game compatibility.
 
 ## Current shared file descriptions and bit-scan batch
 

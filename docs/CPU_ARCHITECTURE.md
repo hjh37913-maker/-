@@ -269,3 +269,11 @@ implement TZCNT/LZCNT feature-dependent prefix interpretations. Portable tests
 cover single bits, extended addressing and faults; on Linux x86-64 196,608
 register comparisons check the native defined destination (nonzero only) and
 ZF, not undefined flags or native guest addressing.
+
+`F3 0F B8 /r` POPCNT additionally supports 16/32/64-bit register and
+memory operands, REX extensions and the two accepted 66/F3 prefix orders.
+The modeled arithmetic flags are cleared except ZF for a zero source; a memory
+fault preserves state. Linux x86-64 native tests first check host CPUID and,
+when available, compare 98,304 register results and status flags. The emulator
+does not model CPUID or PS5 feature availability, and this is not evidence
+that any game can run.
