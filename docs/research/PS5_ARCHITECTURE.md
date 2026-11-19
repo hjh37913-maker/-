@@ -86,8 +86,10 @@ OS-specific symbol/string tables relative to the declared metadata segment,
 and lists encoded names of undefined global/weak symbols. When present,
 OS-tagged RELA and PLT-RELA records are reported as raw relocation type,
 symbol index, target and addend; table sizes and indices are bounded. The
-records are never applied. The inspector neither decodes NIDs/module
-qualifiers nor resolves them. Names are escaped in CLI output. It
+records are never applied. The inspector decodes compact numeric qualifier
+tokens and matches them to declared module/library IDs and versions where
+unambiguous; missing, invalid or duplicate IDs remain unmatched. It does not
+decode or hash NIDs and does not resolve imports for execution. Names are escaped in CLI output. It
 rejects non-ELF input outright and never parses SELF or other protected
 containers, decrypts data, loads segments, or runs code. It is not a PS5
 loader, compatibility verdict, security boundary, or indication GTA VI runs.
@@ -116,3 +118,7 @@ program headers, module/library resolution, initialization, thread-local
 storage, exceptions, OS services, GPU/shaders, and game behavior remain
 unimplemented or unverified. Acceptance of a raw file in this subset does not
 identify its platform or establish validity/compatibility.
+
+The SCE-style relocation arithmetic model exercises 5,000 generated cases
+per test over all four modeled relocation types, randomized load biases,
+values and addends; this is a software reference, not a native PS5 oracle.

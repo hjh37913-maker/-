@@ -177,9 +177,21 @@ int inspect_sce(const char* path) {
     std::cout << "Raw candidate SCE-style ELF metadata only; platform and game compatibility are NOT established.\n"
               << "No code was loaded or executed; encrypted containers are not supported.\n"
               << "Undefined global/weak symbol entries=" << report.imports.size() << '\n';
-    for(const auto& item:report.imports)
+    for(const auto& item:report.imports) {
         std::cout << "symbol[" << item.symbol_index << "] binding=" << unsigned(item.binding) << " type=" << unsigned(item.type)
-                  << " name=" << escaped_symbol(item.encoded_name) << '\n';
+                  << " name=" << escaped_symbol(item.encoded_name);
+        if(item.qualified) {
+            std::cout << " library=" << (item.library_declaration>=0?escaped_symbol(report.declarations[item.library_declaration].name):"<unmatched>")
+                      << " module=" << (item.module_declaration>=0?escaped_symbol(report.declarations[item.module_declaration].name):"<unmatched>");
+        }
+        std::cout << '\n';
+    }
+    std::cout << "OS-tagged module/library declarations=" << report.declarations.size() << '\n';
+    for(const auto& item:report.declarations) {
+        using nightfall::loader::SceDeclarationKind;
+        const char* kind=item.kind==SceDeclarationKind::imported_module?"import-module":item.kind==SceDeclarationKind::exported_module?"export-module":item.kind==SceDeclarationKind::imported_library?"import-library":"export-library";
+        std::cout << kind << " id=" << item.id << " version=" << item.version_major << "." << item.version_minor << " name=" << escaped_symbol(item.name) << '\n';
+    }
     std::cout << "OS-tagged RELA entries=" << report.relocations.size() << '\n';
     for(const auto& item:report.relocations)
         std::cout << (item.plt?"plt":"rela") << " type=" << item.type << " symbol=" << item.symbol_index

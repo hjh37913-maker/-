@@ -6,6 +6,12 @@ namespace nightfall::loader {
 namespace {
 std::uint64_t le(std::span<const std::uint8_t>b,std::size_t p,unsigned n){std::uint64_t x=0;for(unsigned i=0;i<n;++i)x|=std::uint64_t(b[p+i])<<(8*i);return x;}
 bool fits(std::uint64_t p,std::uint64_t n,std::uint64_t size){return p<=size&&n<=size-p;}
+// Numeric declaration IDs are represented as a compact big-endian radix-64
+// token in encoded symbol names; no NID hashing or decoding is performed.
+std::string id_token(std::uint16_t id){
+ constexpr char alphabet[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-";
+ std::string out;do{out.insert(out.begin(),alphabet[id%64]);id=static_cast<std::uint16_t>(id/64);}while(id);return out;
+}
 }
 const char* sce_inspect_status_name(SceInspectStatus s) noexcept {
  switch(s){case SceInspectStatus::ok:return "ok";case SceInspectStatus::read_error:return "read_error";case SceInspectStatus::not_elf:return "not_elf";case SceInspectStatus::unsupported:return "unsupported";case SceInspectStatus::malformed:return "malformed";case SceInspectStatus::resource_limit:return "resource_limit";}
@@ -38,7 +44,12 @@ SceImportReport inspect_sce_imports(const std::filesystem::path& path){
  bool ended=false,hs=false,hl=false,hy=false,he=false,hz=false;
  bool hr=false,hrsz=false,hrent=false,hj=false,hjsz=false,hjtype=false;
  std::uint64_t st=0,sl=0,sy=0,se=0,ss=0,rt=0,rs=0,re=0,jt=0,js=0,jtype=0;
+ std::vector<std::pair<SceDeclarationKind,std::uint64_t>> declarations;
  for(std::size_t p=0;p<dynlen;p+=16){const auto tag=le(dynamic.bytes,p,8),v=le(dynamic.bytes,p+8,8);if(!tag){ended=true;break;}
+  if(tag==0x6100000f||tag==0x61000045||tag==0x6100000d||tag==0x61000043||tag==0x61000015||tag==0x61000049||tag==0x61000013||tag==0x61000047){
+   const auto kind=(tag==0x6100000f||tag==0x61000045)?SceDeclarationKind::imported_module:(tag==0x6100000d||tag==0x61000043)?SceDeclarationKind::exported_module:(tag==0x61000015||tag==0x61000049)?SceDeclarationKind::imported_library:SceDeclarationKind::exported_library;
+   declarations.emplace_back(kind,v);continue;
+  }
   bool* flag=nullptr;std::uint64_t* target=nullptr;
   switch(tag){case 0x61000035:flag=&hs;target=&st;break;case 0x61000037:flag=&hl;target=&sl;break;case 0x61000039:flag=&hy;target=&sy;break;case 0x6100003b:flag=&he;target=&se;break;case 0x6100003f:flag=&hz;target=&ss;break;
   case 0x6100002f:flag=&hr;target=&rt;break;case 0x61000031:flag=&hrsz;target=&rs;break;case 0x61000033:flag=&hrent;target=&re;break;
@@ -54,12 +65,42 @@ SceImportReport inspect_sce_imports(const std::filesystem::path& path){
  auto strings=storage::read_range(path,dataoff+st,static_cast<std::size_t>(sl),65536);
  auto symbols=storage::read_range(path,dataoff+sy,static_cast<std::size_t>(ss),4096*24);
  if(strings.status!=storage::ReadStatus::ok||symbols.status!=storage::ReadStatus::ok)return out;
+ for(const auto& [kind,raw]:declarations){const auto index=static_cast<std::uint32_t>(raw);if(index>=sl){out.declarations.clear();out.status=SceInspectStatus::malformed;return out;}
+  std::size_t e=index;while(e<sl&&e-index<=255&&strings.bytes[e])++e;
+  if(e==index||e==sl||e-index>255){out.declarations.clear();out.status=SceInspectStatus::malformed;return out;}
+  const bool module=kind==SceDeclarationKind::imported_module||kind==SceDeclarationKind::exported_module;
+  const auto major=static_cast<std::uint16_t>(module?(raw>>40)&0xff:(raw>>32)&0xffff);
+  const auto minor=static_cast<std::uint16_t>(module?(raw>>32)&0xff:0);
+  out.declarations.push_back({kind,std::string(reinterpret_cast<const char*>(strings.bytes.data()+index),e-index),static_cast<std::uint16_t>(raw>>48),major,minor});
+ }
  for(std::size_t i=0;i<ss/24;++i){const auto p=i*24, name=le(symbols.bytes,p,4);const auto info=symbols.bytes[p+4];const auto section=le(symbols.bytes,p+6,2);const auto binding=info>>4;
   if(section!=0||!(binding==1||binding==2))continue;
-  if(name>=sl){out.imports.clear();out.status=SceInspectStatus::malformed;return out;}
+  if(name>=sl){out.imports.clear();out.declarations.clear();out.status=SceInspectStatus::malformed;return out;}
   std::size_t e=static_cast<std::size_t>(name);while(e<sl&&e-name<=255&&strings.bytes[e])++e;
-  if(e==name||e==sl||e-name>255){out.imports.clear();out.status=SceInspectStatus::malformed;return out;}
+  if(e==name||e==sl||e-name>255){out.imports.clear();out.declarations.clear();out.status=SceInspectStatus::malformed;return out;}
   out.imports.push_back({std::string(reinterpret_cast<const char*>(strings.bytes.data()+name),e-name),static_cast<std::uint32_t>(i),static_cast<std::uint8_t>(binding),static_cast<std::uint8_t>(info&15)});
+ }
+ // Resolve only local qualifier tokens. Duplicate declaration IDs remain
+ // unmatched. Indexed lookup keeps work bounded even with large tables.
+ std::vector<int> libraries(65536,-1),modules(65536,-1);
+ for(std::size_t i=0;i<out.declarations.size();++i){const auto& decl=out.declarations[i];
+  std::vector<int>* table=decl.kind==SceDeclarationKind::imported_library?&libraries:decl.kind==SceDeclarationKind::imported_module?&modules:nullptr;
+  if(table){auto& slot=(*table)[decl.id];slot=slot==-1?static_cast<int>(i):-2;}
+ }
+ auto decode_token=[](std::string_view token,int& result){
+  constexpr std::string_view alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-";
+  if(token.empty()||token.size()>3)return false;
+  unsigned value=0;for(char ch:token){const auto digit=alphabet.find(ch);if(digit==alphabet.npos)return false;value=value*64+static_cast<unsigned>(digit);}
+  if(value>65535||id_token(static_cast<std::uint16_t>(value))!=token)return false;
+  result=static_cast<int>(value);return true;
+ };
+ for(auto& item:out.imports){
+  const auto first=item.encoded_name.find('#');if(first==std::string::npos||first==0)continue;
+  const auto second=item.encoded_name.find('#',first+1);
+  if(second==std::string::npos||second==first+1||second+1==item.encoded_name.size()||item.encoded_name.find('#',second+1)!=std::string::npos)continue;
+  item.qualified=true;int lib=0,mod=0;
+  if(decode_token(std::string_view(item.encoded_name).substr(first+1,second-first-1),lib)&&libraries[lib]>=0)item.library_declaration=libraries[lib];
+  if(decode_token(std::string_view(item.encoded_name).substr(second+1),mod)&&modules[mod]>=0)item.module_declaration=modules[mod];
  }
  auto parse_relocations=[&](std::uint64_t offset,std::uint64_t length,bool plt){
   if(!length)return SceInspectStatus::ok;
@@ -71,8 +112,8 @@ SceImportReport inspect_sce_imports(const std::filesystem::path& path){
   }
   return SceInspectStatus::ok;
  };
- if(hr){const auto status=parse_relocations(rt,rs,false);if(status!=SceInspectStatus::ok){out.imports.clear();out.relocations.clear();out.status=status;return out;}}
- if(hj){const auto status=parse_relocations(jt,js,true);if(status!=SceInspectStatus::ok){out.imports.clear();out.relocations.clear();out.status=status;return out;}}
+ if(hr){const auto status=parse_relocations(rt,rs,false);if(status!=SceInspectStatus::ok){out.imports.clear();out.relocations.clear();out.declarations.clear();out.status=status;return out;}}
+ if(hj){const auto status=parse_relocations(jt,js,true);if(status!=SceInspectStatus::ok){out.imports.clear();out.relocations.clear();out.declarations.clear();out.status=status;return out;}}
  out.status=SceInspectStatus::ok;return out;
 }
 }
