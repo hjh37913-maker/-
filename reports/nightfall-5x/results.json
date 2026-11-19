@@ -1,0 +1,492 @@
+[
+  {
+    "cycle": 1,
+    "start_utc": "2026-11-19T10:18:33.241036+00:00",
+    "variants": [
+      {
+        "variant": "debug",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.165
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.917
+          }
+        ],
+        "seconds": 1.398,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-01-debug.log",
+        "junit": "cycle-01-debug.xml"
+      },
+      {
+        "variant": "release",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.165
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.365
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.216
+          }
+        ],
+        "seconds": 0.747,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-01-release.log",
+        "junit": "cycle-01-release.xml"
+      },
+      {
+        "variant": "sanitize",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.165
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.365
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 2.222
+          }
+        ],
+        "seconds": 2.752,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-01-sanitize.log",
+        "junit": "cycle-01-sanitize.xml"
+      }
+    ],
+    "seconds": 4.897,
+    "end_utc": "2026-11-19T10:18:38.138233+00:00"
+  },
+  {
+    "cycle": 2,
+    "start_utc": "2026-11-19T10:18:38.138877+00:00",
+    "variants": [
+      {
+        "variant": "debug",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.165
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.917
+          }
+        ],
+        "seconds": 1.397,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-02-debug.log",
+        "junit": "cycle-02-debug.xml"
+      },
+      {
+        "variant": "release",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.165
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.368
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.265
+          }
+        ],
+        "seconds": 0.798,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-02-release.log",
+        "junit": "cycle-02-release.xml"
+      },
+      {
+        "variant": "sanitize",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.164
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 2.073
+          }
+        ],
+        "seconds": 2.552,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-02-sanitize.log",
+        "junit": "cycle-02-sanitize.xml"
+      }
+    ],
+    "seconds": 4.749,
+    "end_utc": "2026-11-19T10:18:42.887514+00:00"
+  },
+  {
+    "cycle": 3,
+    "start_utc": "2026-11-19T10:18:42.888242+00:00",
+    "variants": [
+      {
+        "variant": "debug",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.164
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.916
+          }
+        ],
+        "seconds": 1.396,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-03-debug.log",
+        "junit": "cycle-03-debug.xml"
+      },
+      {
+        "variant": "release",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.165
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.365
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.269
+          }
+        ],
+        "seconds": 0.799,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-03-release.log",
+        "junit": "cycle-03-release.xml"
+      },
+      {
+        "variant": "sanitize",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.165
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 2.12
+          }
+        ],
+        "seconds": 2.6,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-03-sanitize.log",
+        "junit": "cycle-03-sanitize.xml"
+      }
+    ],
+    "seconds": 4.796,
+    "end_utc": "2026-11-19T10:18:47.683912+00:00"
+  },
+  {
+    "cycle": 4,
+    "start_utc": "2026-11-19T10:18:47.684534+00:00",
+    "variants": [
+      {
+        "variant": "debug",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.164
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.917
+          }
+        ],
+        "seconds": 1.396,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-04-debug.log",
+        "junit": "cycle-04-debug.xml"
+      },
+      {
+        "variant": "release",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.164
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.214
+          }
+        ],
+        "seconds": 0.694,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-04-release.log",
+        "junit": "cycle-04-release.xml"
+      },
+      {
+        "variant": "sanitize",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.164
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 2.171
+          }
+        ],
+        "seconds": 2.651,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-04-sanitize.log",
+        "junit": "cycle-04-sanitize.xml"
+      }
+    ],
+    "seconds": 4.741,
+    "end_utc": "2026-11-19T10:18:52.425660+00:00"
+  },
+  {
+    "cycle": 5,
+    "start_utc": "2026-11-19T10:18:52.426468+00:00",
+    "variants": [
+      {
+        "variant": "debug",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.164
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.917
+          }
+        ],
+        "seconds": 1.397,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-05-debug.log",
+        "junit": "cycle-05-debug.xml"
+      },
+      {
+        "variant": "release",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.165
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.315
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 0.214
+          }
+        ],
+        "seconds": 0.695,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-05-release.log",
+        "junit": "cycle-05-release.xml"
+      },
+      {
+        "variant": "sanitize",
+        "steps": [
+          {
+            "phase": "configure",
+            "rc": 0,
+            "seconds": 0.164
+          },
+          {
+            "phase": "build",
+            "rc": 0,
+            "seconds": 0.365
+          },
+          {
+            "phase": "test",
+            "rc": 0,
+            "seconds": 2.171
+          }
+        ],
+        "seconds": 2.7,
+        "stats": {
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0
+        },
+        "crosscheck_29440": true,
+        "log": "cycle-05-sanitize.log",
+        "junit": "cycle-05-sanitize.xml"
+      }
+    ],
+    "seconds": 4.792,
+    "end_utc": "2026-11-19T10:18:57.218933+00:00"
+  }
+]
