@@ -1,0 +1,2 @@
+# Shader research
+No compiler or shader translator is implemented. Evaluate SPIR-V tooling and LLVM alongside a minimal custom intermediate representation when guest semantics can be established lawfully. Experiments should use independently authored shaders and compare deterministic output, diagnostics and compilation time. Console shader ISA, bindings and translation fidelity remain unknown; do not treat host shader compilation as console support.

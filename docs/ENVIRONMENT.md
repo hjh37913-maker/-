@@ -1,0 +1,2 @@
+# Environment assessment — 2026-11-19
+Linux x86-64 sandbox, kernel 6.1.158+, GCC 12.2.0, Python 3.11.2, make and zip. Approximately 3.8 GiB RAM and 20 GiB free disk reported. No `/dev/dri` or vulkaninfo detected, no Windows SDK or Windows host observed. CMake was initially absent; installed temporarily from PyPI outside the repository for the test. No GPU workload or Windows build was attempted. Hardware limits and availability can change between sessions.

@@ -1,0 +1,7 @@
+# Storage experiment
+
+`storage::read_range` reads an exact range from a regular host file synchronously. Its caller supplies both the path and a maximum allowed byte count. Limit, regular-file preflight, seekability and full range are checked before allocation; failures return a status and no bytes. A concurrent truncation or failed read produces an I/O error. Zero-byte reads at EOF are valid. Explicit statuses distinguish limit, open, non-regular, range, I/O and allocation errors. `std::filesystem` and stream errors are platform dependent; allocation/filesystem exceptions outside the caught vector allocation cases may still propagate.
+
+`Crc32` implements incremental CRC-32/ISO-HDLC, useful for detecting accidental corruption. It is neither a cryptographic digest nor an authenticity or DRM mechanism. Tests use original temporary files and known checksum values.
+
+This is not a secure file sandbox: paths are host paths, symbolic links are followed, and the preflight check and open have a TOCTOU race. It is not safe to expose to untrusted paths or mutable hostile files. Files can change during reading; no atomic snapshot or reliable change detection is promised. No asynchronous I/O, cache, mounting, console filesystem, decompression, game package support, streaming scheduler or PS5 storage emulation exists. Concurrent calls have no shared state, but access to mutable files and individual checksum objects requires caller coordination.
