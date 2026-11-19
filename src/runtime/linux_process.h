@@ -10,7 +10,7 @@ namespace nightfall::runtime {
 // No guest syscall is forwarded to the host. Only captured stdout/stderr writes
 // bounded stdin, readv/writev, a configured test heap, and process exit are modeled;
 // unknown calls return -ENOSYS.
-enum class ProcessResult { exited, halted, invalid_instruction, memory_fault, budget_exhausted, already_exited, divide_error };
+enum class ProcessResult { exited, halted, invalid_instruction, memory_fault, budget_exhausted, already_exited, divide_error, alignment_fault };
 struct ProcessReport { ProcessResult result=ProcessResult::budget_exhausted; std::size_t attempted=0; std::uint64_t stop_rip=0; std::uint8_t exit_code=0; };
 // Minimal startup layout (argc/argv, empty environment and AT_NULL), not a
 // complete Linux auxiliary vector. All input is bounded and trusted only.

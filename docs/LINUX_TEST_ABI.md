@@ -24,7 +24,8 @@ stdin mode, reads host standard input.
   need not have native Linux's partial-progress semantics. The test heap is
   at most 1 MiB; the input buffer is at most 65536 bytes.
 * Guest divide-by-zero and quotient overflow stop with a modeled `divide_error`;
-  no SIGFPE or guest signal delivery is implemented.
+  no SIGFPE or guest signal delivery is implemented. Unaligned MOVDQA/MOVAPS
+  memory operands stop with a modeled `alignment_fault`, not a delivered #GP.
 * No dynamic linker, TLS, process environment, filesystem, networking, thread
   scheduler, PS5 loader, graphics API, GPU/shader execution or DRM handling.
   Loader and CPU instruction support are deliberately incomplete.

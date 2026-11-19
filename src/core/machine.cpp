@@ -11,7 +11,7 @@ RunReport Machine::run_detailed(std::size_t instruction_budget) {
         report.stop_rip=before;
         if (step==StepResult::halted) { report.result=RunResult::halted; return report; }
         if (step==StepResult::syscall_trap) { report.result=RunResult::syscall_trap; return report; }
-        report.result=step==StepResult::invalid_instruction?RunResult::invalid_instruction:step==StepResult::divide_error?RunResult::divide_error:RunResult::memory_fault;
+        report.result=step==StepResult::invalid_instruction?RunResult::invalid_instruction:step==StepResult::divide_error?RunResult::divide_error:step==StepResult::alignment_fault?RunResult::alignment_fault:RunResult::memory_fault;
         for (std::size_t n=0;n<report.fault_bytes.size();++n) {
             if (n>std::numeric_limits<std::uint64_t>::max()-before ||
                 !memory.fetch(before+n,std::span(report.fault_bytes).subspan(n,1))) break;

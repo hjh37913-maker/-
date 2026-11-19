@@ -64,3 +64,12 @@ baseline took 81.4–82.3 ms and after took 85.3–88.6 ms. These are small,
 non-interleaved synthetic samples subject to noise; they do not establish a
 workload-wide improvement and are not Windows, PS5 or game performance.
 `cpu_div_benchmark` is available with `NIGHTFALL_BUILD_BENCHMARKS=ON`.
+
+## Per-step instruction fetch reuse
+Three alternating, unpinned Linux x86-64 GCC 12.2 Release samples ran one
+million interpreted `ADD RAX,RBX` operations per sample, resetting RIP each
+iteration. With the expanded decoder, the pre-cache executable measured
+223.6–282.0 ms; after per-step fetch reuse it measured 78.7–79.2 ms. Both
+verified the same final result. Samples were taken sequentially on the same
+host and are noisy; this is one synthetic instruction mix, not a general
+speedup, Windows measurement, PS5 result, or game frame-rate estimate.

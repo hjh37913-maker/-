@@ -4,7 +4,7 @@ import platform
 import subprocess
 import sys
 
-cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions, strings, compiled_hash = sys.argv[1:]
+cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions, strings, compiled_hash, compiled_vector = sys.argv[1:]
 def guest(file, budget='100', *argv):
     return subprocess.run([cli, '--run-linux-elf', file, budget, *argv], capture_output=True)
 q=guest(hello)
@@ -45,6 +45,21 @@ assert q.returncode==0 and q.stdout==b'Multiply OK\n', (q.returncode,q.stdout,q.
 if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
     native=subprocess.run([multiply],capture_output=True)
     assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+# GCC-compiled SSE2 integer vector fixture; short input exits without output.
+for size in range(65):
+    sample=bytes((i*43+size*7)&255 for i in range(size))
+    q=subprocess.run([cli,'--run-linux-elf-stdin',compiled_vector,'1000'],input=sample,capture_output=True)
+    if size<32: expected_code,expected=1,b''
+    else:
+        expected_code=0; expected=b''
+        for lane in range(4):
+            a=int.from_bytes(sample[lane*4:lane*4+4],'little')
+            b=int.from_bytes(sample[16+lane*4:20+lane*4],'little')
+            expected+=(((a+b)&0xffffffff)^b).to_bytes(4,'little')
+    assert (q.returncode,q.stdout)==(expected_code,expected), (size,q.returncode,q.stdout,q.stderr)
+    if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
+        native=subprocess.run([compiled_vector],input=sample,capture_output=True)
+        assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
 # A compiler-generated, freestanding C ELF combines read, byte loads,
 # arithmetic, IMUL, shifts, indexed lookup, stores, and write.
 for size in range(71):

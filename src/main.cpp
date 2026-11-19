@@ -25,13 +25,14 @@ const char* name(nightfall::RunResult result) {
     case nightfall::RunResult::invalid_instruction: return "invalid_instruction";
     case nightfall::RunResult::memory_fault: return "memory_fault";
     case nightfall::RunResult::divide_error: return "divide_error";
+    case nightfall::RunResult::alignment_fault: return "alignment_fault";
     case nightfall::RunResult::budget_exhausted: return "budget_exhausted";
     }
     return "unknown";
 }
 void diagnostic(const nightfall::RunReport& report) {
     std::cout << "Execution steps attempted=" << report.attempted << " stop RIP=" << report.stop_rip << '\n';
-    if (report.result==nightfall::RunResult::memory_fault || report.result==nightfall::RunResult::invalid_instruction || report.result==nightfall::RunResult::divide_error) {
+    if (report.result==nightfall::RunResult::memory_fault || report.result==nightfall::RunResult::invalid_instruction || report.result==nightfall::RunResult::divide_error || report.result==nightfall::RunResult::alignment_fault) {
         std::cout << "Bytes accessible at stop RIP (not decoded; memory fault may be data access):";
         if (!report.fault_byte_count) std::cout << " unavailable";
         for (std::size_t i=0;i<report.fault_byte_count;++i)
@@ -94,6 +95,7 @@ const char* process_name(nightfall::runtime::ProcessResult result) {
     case ProcessResult::budget_exhausted: return "budget_exhausted";
     case ProcessResult::already_exited: return "already_exited";
     case ProcessResult::divide_error: return "divide_error";
+    case ProcessResult::alignment_fault: return "alignment_fault";
     }
     return "unknown";
 }

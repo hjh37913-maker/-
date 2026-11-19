@@ -17,8 +17,16 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 120 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 124 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current SSE2 integer and fetch-cache batch
+
+Added selected XMM integer and bitwise moves/operations, explicit alignment
+fault reporting, a compiled original vector ELF, and within-step instruction
+fetch reuse. Linux Debug, Release and ASan+UBSan: 124/124 CTest tests each.
+Windows x64 cross-compilation only; no vector ABI, GPU or PS5 compatibility is
+claimed. See CPU_ARCHITECTURE.md and PERFORMANCE.md for exact evidence.
 
 ## Current REX32 and compiled ELF batch
 

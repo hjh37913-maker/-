@@ -224,3 +224,36 @@ SIB addressing, invalid/truncated NOPs and faulting memory. An original GCC
 bytes and prints a hex result: 71 sizes are checked against an independent
 Python reference and native execution. FNV-1a is not cryptographic. No claim
 of general C execution or PlayStation/Windows compatibility follows.
+
+## Initial SSE/SSE2 integer subset
+
+Sixteen 128-bit XMM registers are stored as little-endian byte arrays.
+Selected instructions implement bitwise MOVDQU, MOVDQA, MOVUPS and MOVAPS;
+MOVD/MOVQ between XMM and GPR/memory; PXOR/PAND/POR/PANDN; packed wrapping
+PADD/PSUB at byte, word, dword and qword widths; and PSHUFD with an immediate.
+These operations preserve integer flags. XMM/GPR REX extensions and selected
+memory forms are supported. This is **not** a general SSE/AVX implementation,
+floating-point engine, GPU, MXCSR model, XSAVE implementation or complete
+platform vector ABI.
+
+Memory MOVDQA/MOVAPS require 16-byte alignment and stop with the model's
+`alignment_fault`, propagated through Machine and the Linux test runtime; no
+hardware #GP or guest OS signal is delivered. MOVDQU/MOVUPS accept unaligned
+addresses. A modeled alignment check does not reproduce every x86 fault
+priority or canonical-address rule. Other instructions and prefixes remain
+unsupported. Instruction/data faults do not commit partial XMM results.
+
+Linux x86-64 tests include 98,304 native comparisons of packed integer
+operations, selected native move cases, all PSHUFD selectors checked against a
+lane reference (one selector also checked natively), four deliberate alignment
+faults in isolated native children, and portable alias and memory-fault tests.
+A GCC 12.2 compiled, original SSE2 ELF is checked against native execution and
+a Python lane reference. These finite cases do not prove full SIMD behavior.
+
+## Per-step fetch cache
+
+Repeated decoder checks share execute-validated instruction bytes within one
+`Cpu::step` only. The cache never survives the step; repeated string elements
+therefore re-fetch and recheck permissions. Tests modify instructions and
+permissions between steps. The memory model does not support concurrent guest
+mapping modifications or provide a sandbox.
