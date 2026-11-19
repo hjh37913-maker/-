@@ -17,8 +17,17 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 148 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 149 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current restricted SCE-style raw relocation experiment
+
+Added an opt-in C++ API to map and apply a narrow subset of OS-tagged
+relocations to independently authored synthetic raw ELF data with explicit
+guest bindings and transactional failure. Linux Debug, Release and ASan+UBSan
+passed 149/149 tests. Windows CLI and portable test cross-compiled, not run.
+No authentic PS5 executable or game was tested; this is not a PS5 launcher,
+complete ABI or evidence GTA VI runs. See research/PS5_ARCHITECTURE.md.
 
 ## Current candidate relocation metadata inspection
 
