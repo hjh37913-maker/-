@@ -17,6 +17,35 @@ std::array<std::uint8_t,8> bytes64(std::uint64_t value) {
     for (unsigned i=0;i<8;++i) bytes[i]=static_cast<std::uint8_t>(value>>(8*i));
     return bytes;
 }
+// Decode 64-bit effective-address components for a ModRM memory operand.
+// trailing is the number of bytes after displacement (e.g. MOV imm32), which
+// are part of the instruction length used by RIP-relative addressing.
+bool effective_address(const Memory& memory, const CpuState& state, std::array<std::uint8_t,15>& bytes,
+                       unsigned modrm_pos, std::uint8_t rex, unsigned trailing,
+                       std::uint64_t& address, unsigned& length) {
+    const auto mod=bytes[modrm_pos]>>6, low_rm=bytes[modrm_pos]&7;
+    length=modrm_pos+1;
+    std::uint64_t base=0,index=0;
+    bool rip_relative=false,no_base=false;
+    if (low_rm==4) {
+        if (!memory.fetch(state.rip,std::span(bytes).first(length+1))) return false;
+        const auto sib=bytes[length++];
+        const unsigned low_index=(sib>>3)&7;
+        if (low_index!=4 || (rex&2)) index=*state.reg(low_index+((rex&2)?8:0)) << (sib>>6);
+        const unsigned low_base=sib&7;
+        no_base=mod==0 && low_base==5;
+        if (!no_base) base=*state.reg(low_base+((rex&1)?8:0));
+    } else if (mod==0 && low_rm==5) rip_relative=true;
+    else base=*state.reg(low_rm+((rex&1)?8:0));
+    const unsigned disp_size=mod==1 ? 1 : ((mod==2 || rip_relative || no_base) ? 4 : 0);
+    const unsigned disp_offset=length;
+    length+=disp_size+trailing;
+    if (!memory.fetch(state.rip,std::span(bytes).first(length))) return false;
+    const auto displacement=disp_size ? sign_extend(little(bytes.data()+disp_offset,disp_size),disp_size*8) : 0;
+    if (rip_relative) base=state.rip+length;
+    address=base+index+displacement;
+    return true;
+}
 bool condition(unsigned code, std::uint64_t flags) {
     const bool cf=flags & (1ULL<<0), pf=flags & (1ULL<<2), zf=flags & (1ULL<<6),
                sf=flags & (1ULL<<7), of=flags & (1ULL<<11);
@@ -80,7 +109,7 @@ void arithmetic(CpuState& state, std::uint64_t& destination, std::uint64_t rhs, 
 }
 }
 StepResult Cpu::step(Memory& memory) {
-    std::array<std::uint8_t, 10> b{};
+    std::array<std::uint8_t, 15> b{};
     if (!memory.fetch(state.rip, std::span(b).first(1))) return StepResult::memory_fault;
     if (b[0] == 0x90 || b[0] == 0xf4) {
         ++state.rip;
@@ -162,13 +191,36 @@ StepResult Cpu::step(Memory& memory) {
         if (taken) state.rip+=sign_extend(little(b.data()+2,4),32);
         return StepResult::running;
     }
-    // Unprefixed 32-bit register-direct forms; REX and memory forms are not yet supported.
+    // Unprefixed 32-bit forms; memory is supported only for MOV and LEA.
     const auto op32=b[0];
-    if (op32==0x83 || op32==0x85 || op32==0x89 || op32==0x8b || op32==0x01 || op32==0x03 ||
+    if (op32==0x83 || op32==0x85 || op32==0x89 || op32==0x8b || op32==0x8d || op32==0xc7 || op32==0x01 || op32==0x03 ||
         op32==0x29 || op32==0x2b || op32==0x39 || op32==0x3b) {
         if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
         const unsigned mod=b[1]>>6, reg=(b[1]>>3)&7, rm=b[1]&7;
-        if (mod!=3) return StepResult::invalid_instruction;
+        if (mod!=3) {
+            if (op32!=0x89 && op32!=0x8b && op32!=0x8d && op32!=0xc7) return StepResult::invalid_instruction;
+            if (op32==0xc7 && reg!=0) return StepResult::invalid_instruction;
+            std::uint64_t address=0; unsigned length=0;
+            if (!effective_address(memory,state,b,1,0,op32==0xc7?4:0,address,length)) return StepResult::memory_fault;
+            if (op32==0x8d) *state.reg(reg)=static_cast<std::uint32_t>(address);
+            else if (op32==0x8b) {
+                std::array<std::uint8_t,4> data{};
+                if (!memory.read(address,data)) return StepResult::memory_fault;
+                *state.reg(reg)=little(data.data(),4);
+            } else {
+                const auto value=op32==0xc7 ? static_cast<std::uint32_t>(little(b.data()+length-4,4)) : static_cast<std::uint32_t>(*state.reg(reg));
+                std::array<std::uint8_t,4> data{};
+                for (unsigned i=0;i<4;++i) data[i]=static_cast<std::uint8_t>(value>>(8*i));
+                if (!memory.write(address,data)) return StepResult::memory_fault;
+            }
+            state.rip+=length; return StepResult::running;
+        }
+        if (op32==0x8d) return StepResult::invalid_instruction;
+        if (op32==0xc7) {
+            if (reg!=0) return StepResult::invalid_instruction;
+            if (!memory.fetch(state.rip,std::span(b).first(6))) return StepResult::memory_fault;
+            *state.reg(rm)=little(b.data()+2,4); state.rip+=6; return StepResult::running;
+        }
         if (op32==0x83) {
             if (reg!=0 && reg!=5 && reg!=7) return StepResult::invalid_instruction;
             if (!memory.fetch(state.rip,std::span(b).first(3))) return StepResult::memory_fault;
@@ -192,7 +244,7 @@ StepResult Cpu::step(Memory& memory) {
         return StepResult::invalid_instruction;
     if (!memory.fetch(state.rip, std::span(b).first(2))) return StepResult::memory_fault;
     if ((b[0] == 0x48 || b[0] == 0x49) && b[1] >= 0xb8 && b[1] <= 0xbf) {
-        if (!memory.fetch(state.rip, b)) return StepResult::memory_fault;
+        if (!memory.fetch(state.rip, std::span(b).first(10))) return StepResult::memory_fault;
         const unsigned index=(b[1]-0xb8) + ((b[0] & 1) ? 8 : 0);
         *state.reg(index) = little(b.data()+2, 8);
         state.rip += 10;
@@ -236,30 +288,8 @@ StepResult Cpu::step(Memory& memory) {
         if (mod!=3) {
             // MOV memory and LEA with base, optional SIB, and signed displacement.
             if (opcode!=0x89 && opcode!=0x8b && opcode!=0x8d) return StepResult::invalid_instruction;
-            unsigned length=3;
-            std::uint64_t base=0, index=0;
-            bool rip_relative=false, no_base=false;
-            if (low_rm==4) {
-                if (!memory.fetch(state.rip,std::span(b).first(4))) return StepResult::memory_fault;
-                const auto sib=b[3]; ++length;
-                const unsigned low_index=(sib>>3)&7;
-                if (low_index!=4 || (b[0]&2)) {
-                    const auto index_reg=low_index+((b[0]&2)?8:0);
-                    index=*state.reg(index_reg) << (sib>>6);
-                }
-                const unsigned low_base=sib&7;
-                no_base=mod==0 && low_base==5;
-                if (!no_base) base=*state.reg(low_base+((b[0]&1)?8:0));
-            } else if (mod==0 && low_rm==5) {
-                rip_relative=true;
-            } else base=*state.reg(rm);
-            const unsigned disp_size=(mod==1) ? 1 : ((mod==2 || rip_relative || no_base) ? 4 : 0);
-            const unsigned disp_offset=length;
-            length+=disp_size;
-            if (!memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
-            const auto displacement=disp_size ? sign_extend(little(b.data()+disp_offset,disp_size),disp_size*8) : 0;
-            if (rip_relative) base=state.rip+length;
-            const auto address=base+index+displacement;
+            unsigned length=0; std::uint64_t address=0;
+            if (!effective_address(memory,state,b,2,b[0],0,address,length)) return StepResult::memory_fault;
             if (opcode==0x8d) { // LEA computes an address without accessing it.
                 *state.reg(reg)=address; state.rip+=length; return StepResult::running;
             }

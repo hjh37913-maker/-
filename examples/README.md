@@ -36,3 +36,6 @@ The C compiler and linker versions or flags may generate different instructions 
 
 ## 32-bit C loop
 `int-loop-demo.c` and `int-loop-demo.elf` are original GCC 12.2 freestanding examples using 32-bit unsigned arithmetic. Build with the same flags as the other C example, changing input and output names. Run `./build/nightfall_cli --run-elf examples/int-loop-demo.elf 100`; expected RAX=45. This file uses the synthetic HLT sentinel: **do not execute it directly on the host**. No operating-system or PS5 interfaces are exercised.
+
+## 32-bit array fixture
+`array-demo.c` and `array-demo.elf` are an original freestanding C example compiled using GCC 12.2 and the same flags as above. The function uses local 32-bit values and returns 42. Run `./build/nightfall_cli --run-elf examples/array-demo.elf 100`. The ELF uses the synthetic HLT sentinel: **do not execute it directly on the host**. No OS or PS5 interface is exercised.

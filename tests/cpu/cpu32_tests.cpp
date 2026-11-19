@@ -14,7 +14,7 @@ int main() {
       CHECK(c.step(m)==StepResult::running && (c.state.rflags&0x40) && !(c.state.rflags&0x801) && c.state.rax==0xffffffff00000000ULL); }
     { Memory m(3); const std::array<std::uint8_t,3> code{0x83,0xf8,0xff}; CHECK(m.write(0,code)); Cpu c;
       c.state.rax=0x12345678ffffffffULL; CHECK(c.step(m)==StepResult::running && c.state.rax==0x12345678ffffffffULL && (c.state.rflags&0x40)); }
-    for (auto op : {std::uint8_t{0x01},std::uint8_t{0x85},std::uint8_t{0x89},std::uint8_t{0x83}}) {
+    for (auto op : {std::uint8_t{0x01},std::uint8_t{0x85},std::uint8_t{0x83}}) {
       const std::array<std::uint8_t,3> code{op,0,1}; Memory m(3); CHECK(m.write(0,code)); Cpu c; c.state.rax=42;
       CHECK(c.step(m)==StepResult::invalid_instruction && c.state.rax==42 && c.state.rip==0);
       Memory truncated(1); CHECK(truncated.write(0,std::span(code).first(1))); Cpu d;

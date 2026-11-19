@@ -30,3 +30,5 @@
 2026-11-19 continuation: Extended conditional execution and TEST to support a specific compiler-generated C loop, not general x86 compliance. Because x86 leaves TEST's AF undefined, the interpreter deliberately preserves it and differential tests compare only defined flags. Both short and near Jcc conditions are tested against explicit truth tables.
 
 2026-11-19 continuation: Added only unprefixed 32-bit register forms required by an independently compiled C loop, with correct zero-extension and defined-flag behavior. Memory operands and REX-extended 32-bit forms remain rejected. JMP rel32 was added independently. Native differential tests were added before compatibility claims.
+
+2026-11-19 continuation: Refactored effective-address calculation into a shared CPU decoder to implement unprefixed 32-bit memory MOV and LEA without duplicating SIB/RIP-relative handling. Immediate bytes are included when calculating RIP-relative addresses. Arithmetic memory and 32-bit REX forms remain unsupported. This work enables only original synthetic/freestanding test programs, not PS5 binaries.

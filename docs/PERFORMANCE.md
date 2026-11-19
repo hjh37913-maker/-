@@ -42,3 +42,6 @@ One unpinned Linux x86-64 GCC 12.2 Release run of `cpu_branch_benchmark` execute
 
 ## CPU 32-bit imm8 experiment
 One unpinned Linux x86-64 GCC 12.2 Release run of `cpu32_benchmark` executed one million interpreted ADD EAX, imm8 operations with host RIP reset: 27,906,166 ns total, 27.9062 ns/iteration. This single synthetic sample does not represent PS5 or game performance.
+
+## CPU 32-bit data-memory experiment
+One unpinned Linux x86-64 GCC 12.2 Release run of `cpu32_memory_benchmark` executed one million interpreted 32-bit MOV store/load pairs with host RIP reset in 72,881,355 ns, or 72.8814 ns per pair. It includes synthetic guest permission checks; this is one measurement, not a PS5 or game performance claim.

@@ -30,3 +30,5 @@
 2026-11-19 continuation: Inspected GCC 12.2 output for a freestanding original C loop, implemented register TEST and all sixteen short/near Jcc conditions, and executed the compiled ELF to synthetic HLT with RAX=45. Checked 1,024 branch/flag combinations and 8,192 native TEST cases; all 30 tests passed on Linux Debug, Release and ASan/UBSan. No PS5 compatibility is implied.
 
 2026-11-19 continuation: Inspected GCC 12.2 output for an original unsigned-32-bit C loop. Added the required 32-bit register operations and JMP rel32; the resulting freestanding ELF produced RAX=45. Checked 15,360 native differential cases and all 33 CTest cases passed on Linux Debug, Release and ASan/UBSan. This is not PS5 or game execution.
+
+2026-11-19 continuation: Inspected GCC 12.2 output for an original freestanding C array example. Implemented required 32-bit memory loads, stores, immediate stores and LEA; the compiled test ELF produced RAX=42. Updated the earlier test that expected all 32-bit memory MOV forms to be invalid, and verified 320 addressing cases plus the full 35-test suite on Linux Debug, Release and ASan/UBSan. No console compatibility is claimed.

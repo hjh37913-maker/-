@@ -16,7 +16,7 @@
 | GPU, shader translation | NOT_IMPLEMENTED | No compatibility implementation |
 | UI / performance telemetry | NOT_IMPLEMENTED | CLI reports synthetic result only |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows untested |
-| Coverage | Measured, limited | 33 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
+| Coverage | Measured, limited | 35 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
 ## Continuation priorities
@@ -68,3 +68,6 @@ Added register TEST and all sixteen short/near Jcc condition codes. An original 
 
 ## Current 32-bit instruction batch
 Added unprefixed 32-bit register-direct MOV/ADD/SUB/CMP/TEST and imm8 ADD/SUB/CMP, plus JMP rel32. The original GCC 12.2 unsigned-32-bit loop fixture executes to synthetic HLT with RAX=45; 15,360 native differential cases passed. All 33 CTest cases passed on Linux Debug, Release and ASan/UBSan. No Windows or PS5 software was tested.
+
+## Current 32-bit memory batch
+Added unprefixed 32-bit MOV loads/stores, immediate stores, LEA and a shared effective-address decoder. An original GCC 12.2 C array fixture executed to synthetic HLT with RAX=42. 320 register/address/mode combinations and all 35 CTest cases passed on Linux Debug, Release and ASan/UBSan. No Windows, PS5 or GTA VI execution has been verified.
