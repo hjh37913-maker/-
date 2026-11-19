@@ -17,7 +17,8 @@ bool file_offset(const std::vector<Segment>& segments,std::uint64_t address,std:
  return false;
 }
 }
-ElfStatus load_static_pie(std::span<const std::uint8_t> file,Machine& machine,std::uint64_t bias,std::uint64_t stack_base,std::size_t stack_size,std::span<const ImportBinding> bindings){
+ElfStatus load_static_pie(std::span<const std::uint8_t> file,Machine& machine,std::uint64_t bias,std::uint64_t stack_base,std::size_t stack_size,std::span<const ImportBinding> bindings,std::string* missing_symbol){
+ if(missing_symbol)missing_symbol->clear();
  if(bindings.size()>1024)return ElfStatus::resource_limit;
  for(std::size_t i=0;i<bindings.size();++i){
   if(bindings[i].name.empty()||bindings[i].name.size()>255||bindings[i].name.find('\0')!=std::string_view::npos||bindings[i].guest_address>=machine.memory.size())return ElfStatus::malformed;
@@ -100,7 +101,7 @@ ElfStatus load_static_pie(std::span<const std::uint8_t> file,Machine& machine,st
     if(end_name==start||end_name==limit||end_name-start>255)return ElfStatus::malformed;
     const std::string_view name(reinterpret_cast<const char*>(file.data()+start),end_name-start);
     bool found=false;for(const auto& item:bindings)if(item.name==name){value=item.guest_address;found=true;break;}
-    if(!found)return ElfStatus::unresolved_symbol;
+    if(!found){if(missing_symbol)missing_symbol->assign(name);return ElfStatus::unresolved_symbol;}
    } else {
     bool inside=false;for(const auto& seg:segments)if(symval>=seg.address&&fits(symval-seg.address,1,seg.memsz)){inside=true;break;}
     if(!inside||!add(bias,symval,value))return ElfStatus::malformed;

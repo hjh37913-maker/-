@@ -19,6 +19,15 @@
 #endif
 namespace {
 constexpr std::size_t capacity=65536, default_budget=10000, max_budget=1000000;
+// Keep untrusted metadata bytes from becoming terminal control sequences.
+std::string escaped_symbol(std::string_view text) {
+    constexpr char hex[]="0123456789abcdef"; std::string out;
+    for(unsigned char c:text) {
+        if(c>=0x20 && c<0x7f && c!='\\') out.push_back(static_cast<char>(c));
+        else { out+="\\x"; out.push_back(hex[c>>4]); out.push_back(hex[c&15]); }
+    }
+    return out;
+}
 const char* name(nightfall::RunResult result) {
     switch (result) {
     case nightfall::RunResult::halted: return "halted";
@@ -110,9 +119,14 @@ int linux_elf(const char* path,std::size_t budget,std::span<const std::string> a
     auto data=nightfall::storage::read_range(path,0,static_cast<std::size_t>(size),image_limit);
     if(data.status!=nightfall::storage::ReadStatus::ok) { std::cerr << "Test ELF read failed.\n"; return 1; }
     nightfall::Machine machine(static_cast<std::size_t>(virtual_size),nightfall::SparsePages{max_pages});
-    auto status=static_pie?nightfall::loader::load_static_pie(data.bytes,machine,0x40000000ULL,virtual_size-stack_size,stack_size)
+    std::string missing_symbol;
+    auto status=static_pie?nightfall::loader::load_static_pie(data.bytes,machine,0x40000000ULL,virtual_size-stack_size,stack_size,{},&missing_symbol)
                           :nightfall::loader::load_elf64(data.bytes,machine,virtual_size-stack_size,stack_size);
-    if(status!=nightfall::loader::ElfStatus::ok) { std::cerr << "Test ELF rejected: " << nightfall::loader::elf_status_name(status) << '\n'; return 1; }
+    if(status!=nightfall::loader::ElfStatus::ok) {
+        std::cerr << "Test ELF rejected: " << nightfall::loader::elf_status_name(status);
+        if(!missing_symbol.empty()) std::cerr << " (unresolved guest symbol: " << escaped_symbol(missing_symbol) << ")";
+        std::cerr << '\n'; return 1;
+    }
     if(!nightfall::runtime::prepare_linux_stack(machine,virtual_size-stack_size,stack_size,args)) { std::cerr << "Cannot prepare bounded test process stack.\n"; return 1; }
     nightfall::runtime::LinuxProcess process(machine);
     if(fixture) {

@@ -35,7 +35,8 @@ for ordinary defined symbols or explicitly supplied import bindings. Defined
 symbols resolve within the same image without symbol interposition. Bindings
 map exact names to guest virtual addresses only; the loader never looks up
 host symbols or converts host pointers. Unbound imports return
-`unresolved_symbol`. Every import name, binding list, table and relocation
+`unresolved_symbol`; the optional diagnostic reports the first missing name.
+The CLI escapes control bytes in names before printing. Every import name, binding list, table and relocation
 count is bounded. Bindings do not install executable code, PS5 services or
 trampolines; the caller is responsible for their correctness. Guest addresses
 may be unmapped and execution will then fault.
@@ -58,3 +59,7 @@ used only as a native comparison. Other authored `.so` fixtures compare
 self-defined and explicitly bound guest symbols with Linux `dlopen` in an
 isolated test child, not with PS5 software. Sources and reproducible build
 commands are in `examples/README.md`.
+
+The deterministic mutation test changes bytes in an authored ELF, checks that
+failed loads leave state intact, and checks success invariants. It is not a
+coverage-guided fuzzer, independent semantic oracle, or security guarantee.

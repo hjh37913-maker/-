@@ -25,6 +25,7 @@ int main(int argc,char** argv){CHECK(argc==2);std::ifstream in(argv[1],std::ios:
  auto rejected=[&](const std::vector<std::uint8_t>& file,std::span<const ImportBinding> bind,ElfStatus e){Machine m(0x100000);std::array<std::uint8_t,1>a{7},z{};m.memory.write(0,a);m.cpu.state.rip=99;auto r=load_static_pie(file,m,0x10000,0xf0000,0x10000,bind);if(r!=e){std::cerr<<elf_status_name(r)<<" vs "<<elf_status_name(e)<<'\n';return false;}return m.cpu.state.rip==99&&m.memory.read(0,z)&&z==a;};
  std::array<ImportBinding,1> valid{{{"host_export",0x10000+stub}}};std::array<ImportBinding,1> wrong{{{"other",0x10000+stub}}};
  CHECK(rejected(b,{},ElfStatus::unresolved_symbol)&&rejected(b,wrong,ElfStatus::unresolved_symbol));
+ {Machine m(0x100000);std::string missing="stale";CHECK(load_static_pie(b,m,0x10000,0xf0000,0x10000,{},&missing)==ElfStatus::unresolved_symbol&&missing=="host_export");CHECK(load_static_pie(b,m,0x10000,0xf0000,0x10000,valid,&missing)==ElfStatus::ok&&missing.empty());}
  {std::array<ImportBinding,2>x{{valid[0],valid[0]}};CHECK(rejected(b,x,ElfStatus::malformed));}
  {std::array<ImportBinding,1>x{{{"host_export",0x100000}}};CHECK(rejected(b,x,ElfStatus::malformed));}
  {std::array<ImportBinding,1>x{{{"",0x10000}}};CHECK(rejected(b,x,ElfStatus::malformed));}
