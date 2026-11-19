@@ -20,6 +20,15 @@
 | Coverage | Measured, limited | 156 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
+## Experimental multi-image loading (not tested)
+
+Added staged append/start APIs and an all-or-nothing raw ELF bundle path,
+including opt-in exact-name linking from earlier modules. A CLI exposes the
+latter only for trusted authored fixtures. The code was compiled but not run or
+tested at the user's request; it is not a verified PS5 linker or a game
+launcher. It supplies no system libraries, syscall ABI, graphics or decryption.
+See `ELF_LOADER.md`.
+
 ## New raw relocation and service bindings (unverified)
 
 The synthetic raw loader now has experimental generic x86-64 NONE, PC32,

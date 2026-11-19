@@ -11,7 +11,9 @@ bool add(std::uint64_t x,std::uint64_t y,std::uint64_t& z){if(y>UINT64_MAX-x)ret
 struct Segment{std::uint64_t offset,address,filesz,memsz;std::uint32_t flags;};
 struct Field{std::uint64_t value=0;bool seen=false;};
 }
-ElfStatus load_sce_raw_relocatable(std::span<const std::uint8_t> file,Machine& machine,std::uint64_t bias,std::uint64_t stack_base,std::size_t stack_size,std::span<const ImportBinding> bindings,std::string* missing,std::span<const SceDependencyBinding> dependencies){
+namespace {
+enum class LoadMode { replace_and_start, append_module, append_and_start };
+ElfStatus load_raw_impl(std::span<const std::uint8_t> file,Machine& machine,std::uint64_t bias,std::uint64_t stack_base,std::size_t stack_size,std::span<const ImportBinding> bindings,std::string* missing,std::span<const SceDependencyBinding> dependencies,LoadMode mode,std::vector<SceExport>* exports){
  if(missing)missing->clear();
  if(bindings.size()>1024||dependencies.size()>1024)return ElfStatus::resource_limit;
  for(std::size_t i=0;i<dependencies.size();++i){const auto& dep=dependencies[i];
@@ -26,8 +28,9 @@ ElfStatus load_sce_raw_relocatable(std::span<const std::uint8_t> file,Machine& m
  const auto type=le(file,16,2);if(file[4]!=2||file[5]!=1||file[6]!=1||file[7]!=9||le(file,18,2)!=62||le(file,20,4)!=1||(type!=0xfe10&&type!=0xfe18))return ElfStatus::unsupported;
  const auto entry=le(file,24,8),phoff=le(file,32,8),num=le(file,56,2);
  if(le(file,52,2)!=64||le(file,54,2)!=56||!num||num>128||!fits(phoff,num*56,file.size()))return ElfStatus::malformed;
- if(!stack_size||!fits(stack_base,stack_size,machine.memory.size()))return ElfStatus::range_error;
- std::uint64_t ip=0;if(!add(bias,entry,ip))return ElfStatus::range_error;
+ const bool start=mode!=LoadMode::append_module;
+ if(start&&(!stack_size||!fits(stack_base,stack_size,machine.memory.size())))return ElfStatus::range_error;
+ std::uint64_t ip=0;if(start&&!add(bias,entry,ip))return ElfStatus::range_error;
  std::vector<Segment> segments;bool hd=false,hdata=false;std::uint64_t d=0,ds=0,data=0,datasize=0;
  for(std::uint64_t i=0;i<num;++i){const auto p=static_cast<std::size_t>(phoff+i*56);const auto pt=le(file,p,4),flags=le(file,p+4,4),off=le(file,p+8,8),addr=le(file,p+16,8),fs=le(file,p+32,8),ms=le(file,p+40,8),align=le(file,p+48,8);
   if(pt==2||pt==0x61000000){if(!fits(off,fs,file.size())||!fs)return ElfStatus::malformed;
@@ -76,11 +79,35 @@ ElfStatus load_sce_raw_relocatable(std::span<const std::uint8_t> file,Machine& m
  if((rela.seen&&(relaent.value!=24||relasz.value%24))||(jmp.seen&&(jmptype.value!=7||jmpsz.value%24)))return ElfStatus::malformed;
  if(relasz.value>4096*24||jmpsz.value>4096*24)return ElfStatus::resource_limit;
  if((rela.seen&&!fits(rela.value,relasz.value,datasize))||(jmp.seen&&!fits(jmp.value,jmpsz.value,datasize)))return ElfStatus::malformed;
- Memory staged=machine.memory.is_sparse()?Memory(machine.memory.size(),SparsePages{machine.memory.max_pages()}):Memory(machine.memory.size(),false);
+ // Each append works on a copy: previous modules and CPU state survive any
+ // ordinary error. Replace mode preserves the original loader's behavior.
+ Memory staged=mode!=LoadMode::replace_and_start?Memory(machine.memory):
+   (machine.memory.is_sparse()?Memory(machine.memory.size(),SparsePages{machine.memory.max_pages()}):Memory(machine.memory.size(),false));
  for(const auto& s:segments){const auto addr=bias+s.address;const auto result=staged.map_detailed(addr,static_cast<std::size_t>(s.memsz),Permission::read|Permission::write);
   if(result==MapStatus::resource_limit)return ElfStatus::resource_limit;
   if(result!=MapStatus::ok)return ElfStatus::overlap;
   if(s.filesz&&!staged.write(addr,file.subspan(static_cast<std::size_t>(s.offset),static_cast<std::size_t>(s.filesz))))return ElfStatus::malformed;
+ }
+ // Export discovery is opt-in and applies only to ordinary, visible, defined
+ // symbols inside the image. Exact-name duplicate exports are ambiguous and
+ // rejected; no host lookup, NID decoding, symbol versions or interposition.
+ std::vector<SceExport> pending_exports;
+ if(exports){
+  for(std::uint64_t i=1;i<symsz.value/24;++i){
+   const auto pos=static_cast<std::size_t>(data+sym.value+i*24);
+   const auto nameoff=le(file,pos,4),section=le(file,pos+6,2),symvalue=le(file,pos+8,8);
+   const auto info=file[pos+4],visibility=file[pos+5];const auto binding=info>>4,stype=info&15;
+   if(!section||section>=0xff00||(binding!=1&&binding!=2)||stype>2||(visibility!=0&&visibility!=3))continue;
+   if(nameoff>=strsz.value)return ElfStatus::malformed;
+   const auto begin=static_cast<std::size_t>(data+str.value+nameoff),end=static_cast<std::size_t>(data+str.value+strsz.value);auto p=begin;
+   while(p<end&&p-begin<=255&&file[p])++p;
+   if(p==begin||p==end||p-begin>255)return ElfStatus::malformed;
+   bool inside=false;for(const auto& segment:segments)if(symvalue>=segment.address&&fits(symvalue-segment.address,1,segment.memsz)){inside=true;break;}
+   std::uint64_t address=0;if(!inside||!add(bias,symvalue,address))return ElfStatus::malformed;
+   std::string name(reinterpret_cast<const char*>(file.data()+begin),p-begin);
+   for(const auto& existing:pending_exports)if(existing.name==name)return ElfStatus::malformed;
+   pending_exports.push_back({std::move(name),address,binding==2});
+  }
  }
  auto relocate=[&](std::uint64_t table,std::uint64_t length)->ElfStatus{
   for(std::uint64_t n=0;n<length;n+=24){const auto p=static_cast<std::size_t>(data+table+n),target=le(file,p,8),info=le(file,p+8,8),addend=le(file,p+16,8);const auto kind=static_cast<std::uint32_t>(info);const auto index=info>>32;std::uint64_t value=0;
@@ -123,10 +150,81 @@ ElfStatus load_sce_raw_relocatable(std::span<const std::uint8_t> file,Machine& m
  if(rela.seen){const auto r=relocate(rela.value,relasz.value);if(r!=ElfStatus::ok)return r;}
  if(jmp.seen){const auto r=relocate(jmp.value,jmpsz.value);if(r!=ElfStatus::ok)return r;}
  for(const auto& s:segments){Permission perm=Permission::none;if(s.flags&4)perm=perm|Permission::read;if(s.flags&2)perm=perm|Permission::write;if(s.flags&1)perm=perm|Permission::execute;if(!staged.protect(bias+s.address,static_cast<std::size_t>(s.memsz),perm))return ElfStatus::malformed;}
- const auto stack=staged.map_detailed(stack_base,stack_size,Permission::read|Permission::write);
- if(stack==MapStatus::resource_limit)return ElfStatus::resource_limit;
- if(stack!=MapStatus::ok)return ElfStatus::overlap;
- std::array<std::uint8_t,1> probe{};if(!staged.fetch(ip,probe))return ElfStatus::no_executable_entry;
- machine.memory=std::move(staged);machine.cpu.state=CpuState{};machine.cpu.state.rip=ip;*machine.cpu.state.reg(4)=stack_base+stack_size;return ElfStatus::ok;
+ if(start){
+  const auto stack=staged.map_detailed(stack_base,stack_size,Permission::read|Permission::write);
+  if(stack==MapStatus::resource_limit)return ElfStatus::resource_limit;
+  if(stack!=MapStatus::ok)return ElfStatus::overlap;
+  // A process entry must belong to this image, not a previously mapped one.
+  bool own_entry=false;for(const auto& segment:segments)
+   if((segment.flags&1)&&entry>=segment.address&&fits(entry-segment.address,1,segment.memsz)){own_entry=true;break;}
+  std::array<std::uint8_t,1> probe{};if(!own_entry||!staged.fetch(ip,probe))return ElfStatus::no_executable_entry;
+ }
+ machine.memory=std::move(staged);
+ if(start){machine.cpu.state=CpuState{};machine.cpu.state.rip=ip;*machine.cpu.state.reg(4)=stack_base+stack_size;}
+ if(exports)*exports=std::move(pending_exports);
+ return ElfStatus::ok;
+}
+} // namespace
+ElfStatus load_sce_raw_relocatable(std::span<const std::uint8_t> file,Machine& machine,std::uint64_t bias,std::uint64_t stack_base,std::size_t stack_size,std::span<const ImportBinding> bindings,std::string* missing,std::span<const SceDependencyBinding> dependencies){
+ return load_raw_impl(file,machine,bias,stack_base,stack_size,bindings,missing,dependencies,LoadMode::replace_and_start,nullptr);
+}
+ElfStatus append_sce_raw_module(std::span<const std::uint8_t> file,Machine& machine,std::uint64_t bias,std::span<const ImportBinding> bindings,std::string* missing,std::span<const SceDependencyBinding> dependencies,std::vector<SceExport>* exports){
+ return load_raw_impl(file,machine,bias,0,0,bindings,missing,dependencies,LoadMode::append_module,exports);
+}
+ElfStatus append_and_start_sce_raw_module(std::span<const std::uint8_t> file,Machine& machine,std::uint64_t bias,std::uint64_t stack_base,std::size_t stack_size,std::span<const ImportBinding> bindings,std::string* missing,std::span<const SceDependencyBinding> dependencies){
+ return load_raw_impl(file,machine,bias,stack_base,stack_size,bindings,missing,dependencies,LoadMode::append_and_start,nullptr);
+}
+ElfStatus load_sce_raw_bundle(std::span<const SceBundleImage> images,Machine& machine,std::uint64_t stack_base,std::size_t stack_size,std::string* missing,std::size_t* failed_index){
+ if(missing)missing->clear();
+ if(failed_index)*failed_index=SIZE_MAX;
+ if(images.empty())return ElfStatus::malformed;
+ if(images.size()>32)return ElfStatus::resource_limit;
+ // Isolate the complete sequence; a later module failure must not expose any
+ // earlier module mappings to the caller. The ordinary append routines also
+ // stage each individual image, trading memory and speed for clarity.
+ Machine staged=machine;
+ for(std::size_t i=0;i<images.size();++i){
+  const auto& image=images[i];
+  const auto status=i+1==images.size()
+   ?append_and_start_sce_raw_module(image.file,staged,image.bias,stack_base,stack_size,image.bindings,missing,image.dependencies)
+   :append_sce_raw_module(image.file,staged,image.bias,image.bindings,missing,image.dependencies);
+  if(status!=ElfStatus::ok){if(failed_index)*failed_index=i;return status;}
+ }
+ machine.memory=std::move(staged.memory);machine.cpu.state=staged.cpu.state;
+ return ElfStatus::ok;
+}
+ElfStatus load_sce_raw_bundle_autobind(std::span<const SceBundleImage> images,Machine& machine,std::uint64_t stack_base,std::size_t stack_size,std::string* problem,std::size_t* failed_index){
+ if(problem)problem->clear();
+ if(failed_index)*failed_index=SIZE_MAX;
+ if(images.empty())return ElfStatus::malformed;
+ if(images.size()>32)return ElfStatus::resource_limit;
+ Machine staged=machine;
+ std::vector<SceExport> known;
+ for(std::size_t i=0;i<images.size();++i){
+  const auto& image=images[i];
+  if(failed_index)*failed_index=i;
+  if(image.bindings.size()>1024 || known.size()>1024-image.bindings.size())return ElfStatus::resource_limit;
+  std::vector<ImportBinding> bindings(image.bindings.begin(),image.bindings.end());
+  for(const auto& entry:known){
+   for(const auto& explicit_binding:image.bindings)if(explicit_binding.name==entry.name){if(problem)*problem=entry.name;return ElfStatus::ambiguous_symbol;}
+   bindings.push_back({entry.name,entry.guest_address});
+  }
+  if(i+1==images.size()){
+   const auto status=append_and_start_sce_raw_module(image.file,staged,image.bias,stack_base,stack_size,bindings,problem,image.dependencies);
+   if(status!=ElfStatus::ok)return status;
+  }else{
+   std::vector<SceExport> found;
+   const auto status=append_sce_raw_module(image.file,staged,image.bias,bindings,problem,image.dependencies,&found);
+   if(status!=ElfStatus::ok)return status;
+   if(found.size()>1024-known.size())return ElfStatus::resource_limit;
+   for(auto& entry:found){
+    for(const auto& existing:known)if(existing.name==entry.name){if(problem)*problem=entry.name;return ElfStatus::ambiguous_symbol;}
+    known.push_back(std::move(entry));
+   }
+  }
+ }
+ machine.memory=std::move(staged.memory);machine.cpu.state=staged.cpu.state;
+ if(failed_index)*failed_index=SIZE_MAX;
+ return ElfStatus::ok;
 }
 }

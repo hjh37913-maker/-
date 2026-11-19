@@ -107,3 +107,39 @@ These new relocation kinds and the service CLI are **not tested**, and their
 behavior or use in actual PS5 executables is **not established**. They do not
 provide a working PS5 dynamic linker. The loader still rejects text relocations,
 TLS, unknown tags and other unsupported features. Do not run untrusted files.
+
+## Experimental multi-image raw loader (not tested)
+
+The C++ API now offers `append_sce_raw_module` to map one provider into an
+existing unmapped/sparse guest machine without changing CPU state, optionally
+returning owned copies of ordinary visible defined symbol names and guest
+addresses. `append_and_start_sce_raw_module` then maps a consumer and stack and
+sets its entry/CPU state. Each call stages memory and commits only on success;
+a failed later call does not undo earlier successful calls. Caller-provided
+bindings and dependencies are assertions, not loaded host libraries.
+
+`load_sce_raw_bundle` provides an all-or-nothing sequence of up to 32 images,
+with caller-specified addresses, symbols and identity assertions. The final
+image becomes the process entry point. `load_sce_raw_bundle_autobind` is an
+opt-in variant that binds exact names from earlier providers; providers must
+precede consumers. Duplicate names, including weak/strong combinations and
+conflicts with explicit bindings, fail rather than guessing; forward/circular
+references, symbol versioning and interposition are not implemented. The
+caller must provide a suitable initially unmapped guest memory and account for
+the expense of staging copies. Allocation exceptions may propagate.
+
+`--run-sce-bundle BUDGET PROVIDER... EXECUTABLE` exposes the opt-in autobinder
+for trusted, independently authored files only. Inputs are limited to 8 MiB
+per file, 32 MiB total, 32 images, 4096 sparse pages and 1,000,000 CPU steps.
+Biases are fixed at `0x100000 + index * 0x400000`; overlaps or incompatible
+alignment fail. No dependency assertions, system services, host functions,
+syscalls, constructors, TLS or PS5 ABI are supplied by this CLI. Images with
+unfulfilled dependencies are rejected. It is not a sandbox and must not be used
+with untrusted data.
+
+**None of these new APIs or the CLI has been executed or tested.** Generic
+exact-name linking here is not established PS5 dynamic-linker behavior: SCE
+module identities, NIDs, versions, symbol resolution and initialization are
+not fully implemented or verified. SELF, encryption, PS5 graphics and games
+remain unsupported. Compilation alone is not correctness or compatibility
+evidence.

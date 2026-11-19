@@ -284,6 +284,45 @@ int sce_raw(const char* path, std::size_t budget, std::span<const std::string_vi
     return report.result==nightfall::RunResult::halted?0:1;
 }
 
+// Opt-in experimental multi-image mode. No system libraries, services, host
+// symbols, decryptors, constructors or startup ABI are supplied automatically.
+int sce_bundle(std::span<const char* const> paths,std::size_t budget) {
+    constexpr std::size_t max_file=8*1024*1024,max_total=32*1024*1024;
+    constexpr std::size_t guest_capacity=256*1024*1024,stack_size=64*1024;
+    constexpr std::uint64_t first_bias=0x100000,bias_step=0x400000,stack_base=guest_capacity-stack_size;
+    std::cout << "Experimental exact-name SCE-style raw ELF bundle for trusted authored files only.\n"
+                 "Not a PS5 emulator, game launcher, decryptor or sandbox.\n";
+    std::vector<std::vector<std::uint8_t>> files;files.reserve(paths.size());
+    std::size_t total=0;
+    for(std::size_t i=0;i<paths.size();++i){
+        std::error_code ec;const auto size=std::filesystem::file_size(paths[i],ec);
+        if(ec||size==0||size>max_file||size>max_total-total){
+            std::cerr << "Invalid or oversized regular file at index " << i << ".\n";return 1;
+        }
+        auto read=nightfall::storage::read_range(paths[i],0,static_cast<std::size_t>(size),max_file);
+        if(read.status!=nightfall::storage::ReadStatus::ok){std::cerr << "Read failed at index " << i << ".\n";return 1;}
+        total+=static_cast<std::size_t>(size);files.push_back(std::move(read.bytes));
+    }
+    std::vector<nightfall::loader::SceBundleImage> images;images.reserve(files.size());
+    for(std::size_t i=0;i<files.size();++i)
+        images.push_back({files[i],first_bias+i*bias_step,{}, {}});
+    nightfall::Machine machine(guest_capacity,nightfall::SparsePages{4096});
+    std::string problem;std::size_t failed=SIZE_MAX;
+    const auto status=nightfall::loader::load_sce_raw_bundle_autobind(images,machine,stack_base,stack_size,&problem,&failed);
+    if(status!=nightfall::loader::ElfStatus::ok){
+        std::cerr << "Bundle rejected: " << nightfall::loader::elf_status_name(status);
+        if(failed!=SIZE_MAX)std::cerr << " image=" << failed;
+        if(!problem.empty())std::cerr << " symbol/dependency=" << escaped_symbol(problem);
+        std::cerr << "\nNo PS5 libraries or services are supplied.\n";return 1;
+    }
+    const auto report=machine.run_detailed(budget);
+    std::cout << "Experimental guest stopped: " << name(report.result) << " RAX=" << machine.cpu.state.rax
+              << " RIP=" << machine.cpu.state.rip << '\n';
+    diagnostic(report);
+    if(report.result==nightfall::RunResult::syscall_trap)std::cerr << "System calls are not implemented in this mode.\n";
+    return report.result==nightfall::RunResult::halted?0:1;
+}
+
 int inspect_sce(const char* path) {
     const auto report=nightfall::loader::inspect_sce_imports(path);
     if(report.status!=nightfall::loader::SceInspectStatus::ok) {
@@ -349,6 +388,18 @@ int main(int argc,char** argv) {
             std::vector<std::string> args{"nightfall-guest"};
             for(int i=4;i<argc;++i) args.emplace_back(argv[i]);
             return linux_elf(argv[2],budget,args,std::string_view(argv[1])=="--run-linux-elf-stdin",std::string_view(argv[1])=="--run-linux-elf-fixture",std::string_view(argv[1])=="--run-linux-static-pie");
+        }
+        if (std::string_view(argv[1])=="--run-sce-bundle") {
+            if(argc<5 || argc>35) {
+                std::cerr << "Usage: nightfall_cli --run-sce-bundle budget provider... executable\n"; return 2;
+            }
+            std::size_t budget=0;const std::string_view value(argv[2]);
+            const auto parsed=std::from_chars(value.data(),value.data()+value.size(),budget);
+            if(value.empty()||parsed.ec!=std::errc{}||parsed.ptr!=value.data()+value.size()||!budget||budget>max_budget){
+                std::cerr << "Budget must be an integer from 1 to " << max_budget << ".\n";return 2;
+            }
+            std::vector<const char*> paths;for(int i=3;i<argc;++i)paths.push_back(argv[i]);
+            return sce_bundle(paths,budget);
         }
         if (std::string_view(argv[1])=="--run-sce-raw-services") {
             if(argc<5 || argc>36) {
