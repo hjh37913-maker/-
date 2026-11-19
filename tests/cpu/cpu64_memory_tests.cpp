@@ -59,6 +59,6 @@ int main() {
     CHECK(c.step(m)==StepResult::running && *c.state.reg(8)==13 && *c.state.reg(12)==56 && *c.state.reg(9)==8); }
   { Memory m(128); Cpu c; const std::array<std::uint8_t,3> code{0x48,0x85,0x03}; CHECK(m.write(0,code) && m.protect(64,8,Permission::write));
     c.state.rax=1; *c.state.reg(3)=64; c.state.rflags=0x812; CHECK(c.step(m)==StepResult::memory_fault && c.state.rip==0 && c.state.rflags==0x812); }
-  { Memory m(3); Cpu c; const std::array<std::uint8_t,3> code{0x48,0x83,0x13}; CHECK(m.write(0,code)); CHECK(c.step(m)==StepResult::invalid_instruction && c.state.rip==0); }
+  { Memory m(3); Cpu c; const std::array<std::uint8_t,3> code{0x48,0x83,0x13}; CHECK(m.write(0,code)); CHECK(c.step(m)==StepResult::memory_fault && c.state.rip==0); }
   std::cout << "768 immediate cross-checks and 64-bit memory fault/address tests passed\n";
 }

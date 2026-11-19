@@ -17,7 +17,7 @@ int main() {
         Memory m(code.size()); if (!m.write(0, code)) return false;
         Cpu c; return c.step(m) == StepResult::running && c.state.rip == code.size();
     };
-    { Memory m(2); constexpr std::array<std::uint8_t,2> unsupported{0x48,0x11};
+    { Memory m(2); constexpr std::array<std::uint8_t,2> unsupported{0x48,0x07};
       if (!m.write(0,unsupported)) return 1;
       Cpu c; c.state.rax=42; c.state.rflags=0x402;
       if (c.step(m)!=StepResult::invalid_instruction || c.state.rip!=0 || c.state.rax!=42 || c.state.rflags!=0x402) {

@@ -107,6 +107,24 @@ void arithmetic(CpuState& state, std::uint64_t& destination, std::uint64_t rhs, 
     if (!compare) destination = result;
     state.rflags = (state.rflags & ~mask) | flags;
 }
+// ADC/SBB operate entirely in unsigned arithmetic to avoid signed overflow.
+std::uint64_t carry_arithmetic(CpuState& state,std::uint64_t a,std::uint64_t b,unsigned width,bool subtract) {
+    const auto mask=width==64?~std::uint64_t{0}:(std::uint64_t{1}<<width)-1;
+    const auto sign=std::uint64_t{1}<<(width-1);
+    a&=mask; b&=mask; const auto carry=state.rflags&1;
+    const auto sum=(a+b)&mask;
+    const auto result=(subtract?a-b-carry:a+b+carry)&mask;
+    const bool cf=subtract?(a<b || (a==b && carry)):(sum<a || (carry && sum==mask));
+    constexpr auto CF=1ULL, PF=1ULL<<2, AF=1ULL<<4, ZF=1ULL<<6, SF=1ULL<<7, OF=1ULL<<11;
+    std::uint64_t flags=cf?CF:0;
+    if ((std::popcount(static_cast<unsigned>(result&0xff))&1)==0) flags|=PF;
+    if ((a^b^result)&0x10) flags|=AF;
+    if (!result) flags|=ZF;
+    if (result&sign) flags|=SF;
+    if ((subtract?(a^b):~(a^b))&(a^result)&sign) flags|=OF;
+    state.rflags=(state.rflags&~(CF|PF|AF|ZF|SF|OF))|flags;
+    return result;
+}
 // Group-1 logical extensions: OR /1, AND /4, XOR /6.
 bool group_logical(unsigned extension) { return extension==1 || extension==4 || extension==6; }
 void group_logical32(CpuState& state, std::uint64_t& dst, std::uint32_t rhs, unsigned extension) {
@@ -207,6 +225,111 @@ StepResult Cpu::step(Memory& memory) {
     if (b[0] == 0x90 || b[0] == 0xf4) {
         ++state.rip;
         return b[0] == 0xf4 ? StepResult::halted : StepResult::running;
+    }
+    // ADC/SBB register, memory, immediate and accumulator forms.
+    // Decode and read all operands before committing memory, registers or flags.
+    {
+        const bool word=b[0]==0x66; unsigned pos=word?1:0;
+        if (word && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        const bool has_rex=b[pos]>=0x40 && b[pos]<=0x4f;
+        const auto rex=has_rex?b[pos]:std::uint8_t{0};
+        if (has_rex) { ++pos; if(!memory.fetch(state.rip,std::span(b).first(pos+1))) return StepResult::memory_fault; }
+        const auto op=b[pos];
+        const bool normal=(op>=0x10 && op<=0x13)||(op>=0x18 && op<=0x1b);
+        const bool accumulator=op==0x14||op==0x15||op==0x1c||op==0x1d;
+        const bool group=op==0x80||op==0x81||op==0x83;
+        bool selected=normal||accumulator; unsigned modrm_pos=pos+1, extension=0;
+        if (group) {
+            if(!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            extension=(b[modrm_pos]>>3)&7; selected=extension==2||extension==3;
+        }
+        if (selected) {
+            const bool subtract=group?extension==3:(op&8)!=0;
+            const bool byte=group?op==0x80:(op&1)==0;
+            if (word && ((rex&8) || byte)) return StepResult::invalid_instruction;
+            const unsigned width=byte?8:word?16:(rex&8)?64:32;
+            const auto mask=width==64?~std::uint64_t{0}:(std::uint64_t{1}<<width)-1;
+            auto read_reg=[&](unsigned low,bool extended) -> std::uint64_t {
+                if(byte && !has_rex && low>=4) return (*state.reg(low-4)>>8)&0xff;
+                return *state.reg(low+(extended?8:0))&mask;
+            };
+            auto write_reg=[&](CpuState& dst,unsigned low,bool extended,std::uint64_t value) {
+                if(byte && !has_rex && low>=4) { auto& r=*dst.reg(low-4); r=(r&~0xff00ULL)|(value<<8); }
+                else { auto& r=*dst.reg(low+(extended?8:0)); r=width==64||width==32?value:(r&~mask)|value; }
+            };
+            const unsigned imm_size=accumulator?(byte?1:word?2:4):group?(op==0x81?(word?2:4):1):0;
+            unsigned length=pos+1; std::uint64_t lhs=0,rhs=0,address=0;
+            unsigned mod=3,low_rm=0,low_reg=0; bool target_reg=true, target_accumulator=accumulator;
+            if (accumulator) {
+                length+=imm_size; if(!memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
+                lhs=state.rax&mask; rhs=little(b.data()+length-imm_size,imm_size);
+            } else {
+                if(!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+                mod=b[modrm_pos]>>6; low_rm=b[modrm_pos]&7; low_reg=(b[modrm_pos]>>3)&7;
+                const bool to_reg=normal && (op&2); target_reg=to_reg || mod==3;
+                std::uint64_t rm=0;
+                if(mod==3) {
+                    length=modrm_pos+1+imm_size;
+                    if(imm_size && !memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
+                    rm=read_reg(low_rm,rex&1);
+                } else {
+                    if(!effective_address(memory,state,b,modrm_pos,rex,imm_size,address,length)) return StepResult::memory_fault;
+                    std::array<std::uint8_t,8> bytes{};
+                    if(!memory.read(address,std::span(bytes).first(width/8))) return StepResult::memory_fault;
+                    rm=little(bytes.data(),width/8);
+                }
+                lhs=to_reg?read_reg(low_reg,rex&4):rm;
+                rhs=group?little(b.data()+length-imm_size,imm_size):to_reg?rm:read_reg(low_reg,rex&4);
+            }
+            if (imm_size && ((group && op==0x83) || (width==64 && imm_size==4))) rhs=sign_extend(rhs,imm_size*8);
+            auto next=state; const auto result=carry_arithmetic(next,lhs,rhs,width,subtract);
+            if (!target_reg) {
+                const auto bytes=bytes64(result); if(!memory.write(address,std::span(bytes).first(width/8))) return StepResult::memory_fault;
+            } else if(target_accumulator) write_reg(next,0,false,result);
+            else if(normal && (op&2)) write_reg(next,low_reg,rex&4,result);
+            else write_reg(next,low_rm,rex&1,result);
+            state=next; state.rip+=length; return StepResult::running;
+        }
+    }
+    // CMOVcc and SETcc: 16 x86 condition codes, no flag changes. CMOV
+    // always reads a memory source, including when the condition is false.
+    {
+        const bool word=b[0]==0x66; unsigned pos=word?1:0;
+        if(word && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        const bool has_rex=b[pos]>=0x40 && b[pos]<=0x4f;
+        const auto rex=has_rex?b[pos]:std::uint8_t{0};
+        if(has_rex) { ++pos; if(!memory.fetch(state.rip,std::span(b).first(pos+1))) return StepResult::memory_fault; }
+        if(b[pos]==0x0f) {
+            if(!memory.fetch(state.rip,std::span(b).first(pos+2))) return StepResult::memory_fault;
+            const auto op=b[pos+1]; const bool cmov=op>=0x40 && op<=0x4f, set=op>=0x90 && op<=0x9f;
+            if(cmov || set) {
+                if(word && ((rex&8)||set)) return StepResult::invalid_instruction;
+                const unsigned modrm_pos=pos+2;
+                if(!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+                const unsigned mod=b[modrm_pos]>>6, low_rm=b[modrm_pos]&7;
+                const unsigned reg=((b[modrm_pos]>>3)&7)+((rex&4)?8:0);
+                const unsigned width=word?16:(rex&8)?64:32;
+                unsigned length=modrm_pos+1; std::uint64_t address=0,source=0;
+                if(mod==3) source=*state.reg(low_rm+((rex&1)?8:0));
+                else {
+                    if(!effective_address(memory,state,b,modrm_pos,rex,0,address,length)) return StepResult::memory_fault;
+                    if(cmov) { std::array<std::uint8_t,8> data{}; if(!memory.read(address,std::span(data).first(width/8))) return StepResult::memory_fault; source=little(data.data(),width/8); }
+                }
+                const bool take=condition(op&15,state.rflags);
+                if(cmov) {
+                    auto& destination=*state.reg(reg);
+                    if(take) destination=word?(destination&~0xffffULL)|(source&0xffff):width==32?source&0xffffffffULL:source;
+                    else if(width==32) destination&=0xffffffffULL;
+                } else if(mod==3) {
+                    if(!has_rex && low_rm>=4) { auto& r=*state.reg(low_rm-4); r=(r&~0xff00ULL)|(std::uint64_t(take)<<8); }
+                    else { auto& r=*state.reg(low_rm+((rex&1)?8:0)); r=(r&~0xffULL)|std::uint64_t(take); }
+                } else {
+                    const std::array<std::uint8_t,1> data{std::uint8_t(take)};
+                    if(!memory.write(address,data)) return StepResult::memory_fault;
+                }
+                state.rip+=length; return StepResult::running;
+            }
+        }
     }
     // BSWAP r32/r64 (0F C8..CF); REX.B extends the encoded register.
     if (b[0]==0x0f || (b[0]>=0x40 && b[0]<=0x4f)) {

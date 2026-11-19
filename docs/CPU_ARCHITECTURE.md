@@ -154,3 +154,27 @@ The source registers and memory forms exercised by guest tests may be compared
 against equivalent native memory operands, not identical address encodings.
 A self-authored Linux ELF exercises successful division; a separate explicit
 fault fixture is run only under the model or an isolated native child.
+
+## Carry arithmetic and conditional moves
+
+`10..15`, `18..1D` and group `80/81/83 /2,/3` implement ADC/SBB
+register, memory, accumulator and immediate forms in 8/16/32/64-bit widths.
+They consume CF and update CF/PF/AF/ZF/SF/OF. All results and flags are
+staged before a destination memory write; memory faults do not commit state.
+Legacy high-byte versus REX byte-register semantics, sign-extended imm8 and
+sign-extended imm32 for qword forms are supported. `66` with REX.W and
+redundant `66` on byte operands are rejected, not generally decoded.
+
+`0F 40..4F` CMOVcc and `0F 90..9F` SETcc use all sixteen existing condition
+codes. CMOV supports 16/32/64-bit register and memory sources. The memory
+source is read even when the condition is false; a false 32-bit CMOV also
+zeroes the destination's upper half in long mode. SET writes a single byte,
+including AH..BH versus REX low/extended registers, without altering flags.
+Operand-size override SETcc and `66` plus REX.W are not supported.
+
+Tests include 393,216 native ADC/SBB arithmetic comparisons across selected
+guest forms, and 49,152 native CMOVcc/SETcc comparisons spanning all 16
+conditions and all combinations of relevant flags. The arithmetic oracle uses
+equivalent native register operations, not the exact guest addressing or
+immediate encoding. Original Linux ELF fixtures exercise carry and conditional
+instructions. Linux tests do not establish Windows or PS5 runtime support.

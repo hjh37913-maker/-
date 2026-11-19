@@ -25,8 +25,8 @@ int main() {
     { const std::array<std::uint8_t,11> code{0x48,0x81,0x05,53,0,0,0,1,2,3,4};
       for(unsigned n=1;n<code.size();++n) { Memory m(n); Cpu c; CHECK(m.write(0,std::span(code).first(n))); c.state.rax=17; c.state.rflags=0x812;
         CHECK(c.step(m)==StepResult::memory_fault && c.state.rip==0 && c.state.rax==17 && c.state.rflags==0x812); } }
-    // Unsupported group extension still fails without touching state.
+    // Newly supported ADC with truncated immediate still faults before state changes.
     for (auto wide : {false,true}) { Memory m(3); Cpu c; const std::array<std::uint8_t,3> code=wide?std::array<std::uint8_t,3>{0x48,0x81,0xd0}:std::array<std::uint8_t,3>{0x81,0xd0,0};
-      CHECK(m.write(0,code) && c.step(m)==StepResult::invalid_instruction && c.state.rip==0); }
+      CHECK(m.write(0,code) && c.step(m)==StepResult::memory_fault && c.state.rip==0); }
     std::cout << "portable imm32 group tests passed\n";
 }

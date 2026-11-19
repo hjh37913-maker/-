@@ -4,7 +4,7 @@ import platform
 import subprocess
 import sys
 
-cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault = sys.argv[1:]
+cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions = sys.argv[1:]
 def guest(file, budget='100', *argv):
     return subprocess.run([cli, '--run-linux-elf', file, budget, *argv], capture_output=True)
 q=guest(hello)
@@ -44,6 +44,16 @@ q=guest(multiply)
 assert q.returncode==0 and q.stdout==b'Multiply OK\n', (q.returncode,q.stdout,q.stderr)
 if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
     native=subprocess.run([multiply],capture_output=True)
+    assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+q=guest(conditions)
+assert q.returncode==0 and q.stdout==b'Conditions OK\n', (q.returncode,q.stdout,q.stderr)
+if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
+    native=subprocess.run([conditions],capture_output=True)
+    assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+q=guest(carry)
+assert q.returncode==0 and q.stdout==b'Carry OK\n', (q.returncode,q.stdout,q.stderr)
+if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
+    native=subprocess.run([carry],capture_output=True)
     assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
 q=guest(divide)
 assert q.returncode==0 and q.stdout==b'Divide OK\n', (q.returncode,q.stdout,q.stderr)
