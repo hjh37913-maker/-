@@ -36,6 +36,6 @@ int main() {
       CHECK(c.step(m)==StepResult::running && c.state.rax==UINT64_MAX && (c.state.rflags&0x40)); }
     { Memory m(3); const std::array<std::uint8_t,3> code{0x48,0x83,0xc0}; CHECK(m.write(0,code)); Cpu c; c.state.rax=5; c.state.rflags=0x402;
       CHECK(c.step(m)==StepResult::memory_fault && c.state.rip==0 && c.state.rax==5 && c.state.rflags==0x402); }
-    { Memory m(4); const std::array<std::uint8_t,4> code{0x48,0x83,0xc8,1}; CHECK(m.write(0,code)); Cpu c;
+    { Memory m(4); const std::array<std::uint8_t,4> code{0x48,0x83,0xd0,1}; CHECK(m.write(0,code)); Cpu c;
       CHECK(c.step(m)==StepResult::invalid_instruction && c.state.rip==0); }
 }

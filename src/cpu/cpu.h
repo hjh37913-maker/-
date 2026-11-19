@@ -16,7 +16,7 @@ struct CpuState {
         return index == 0 ? &rax : index < 16 ? &other_registers[index-1] : nullptr;
     }
     std::uint64_t rip = 0;
-    // ADD/SUB/CMP and TEST update a subset of flags; other flags are preserved.
+    // Arithmetic and logical operations update modeled flags; other flags are preserved.
     std::uint64_t rflags = 2;
 };
 class Cpu {

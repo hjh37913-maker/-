@@ -63,3 +63,10 @@ AND and OR. It was built with GCC 12.2 using the flags above. Run
 `./build/nightfall_cli --run-elf examples/and-or-demo.elf 100`: the interpreter
 should halt with RAX=42. The synthetic HLT is **not safe to execute on the
 host**. This does not test an OS, PS5 runtime or a game.
+
+## Logical immediate C fixture
+`logical-immediate-demo.c` and its GCC 12.2 compiled ELF exercise the OR,
+XOR and AND imm8 register forms. Build using the freestanding flags above;
+`./build/nightfall_cli --run-elf examples/logical-immediate-demo.elf 100`
+halts with RAX=42. This original test includes synthetic HLT and must **not**
+be executed directly on the host. It does not exercise OS or PS5 services.

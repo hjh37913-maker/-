@@ -63,7 +63,7 @@ int main() {
       CHECK(c.step(m)==StepResult::memory_fault && c.state.rip==0 && c.state.rax==1 && c.state.rflags==0x812); }
     { Memory m(2); Cpu c; const std::array<std::uint8_t,2> code{0x83,0x03}; CHECK(m.write(0,code));
       CHECK(c.step(m)==StepResult::memory_fault && c.state.rip==0); }
-    { Memory m(2); Cpu c; const std::array<std::uint8_t,2> code{0x83,0x0b}; CHECK(m.write(0,code));
+    { Memory m(2); Cpu c; const std::array<std::uint8_t,2> code{0x83,0x13}; CHECK(m.write(0,code));
       CHECK(c.step(m)==StepResult::invalid_instruction && c.state.rip==0); }
     std::cout << count << " memory/register cross-checks passed\n";
 }

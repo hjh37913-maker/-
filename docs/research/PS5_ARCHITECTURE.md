@@ -27,3 +27,13 @@ The first regression run exposed a stale unsupported-opcode test; it now
 checks a still-unsupported opcode and separately checks a truncated AND.
 This generic instruction support does not implement the PS5 runtime or make
 any game compatible.
+
+### Logical immediates experiment (2026-11-19)
+Added group-1 OR/AND/XOR immediate forms for 32/64-bit registers and memory.
+49,152 results and defined flags are compared with equivalent native register
+operations, not the same instruction encoding or guest addressing. Portable
+checks cover short fetch and write faults. An initial test build failed due to
+an assembly-test macro naming collision; after fixing that, four existing
+unsupported-opcode checks failed because their opcodes are now implemented.
+Those checks now use unsupported ADC, preserving the original assertions;
+full regressions passed. This does not add a PS5 ABI or game compatibility.

@@ -107,6 +107,17 @@ void arithmetic(CpuState& state, std::uint64_t& destination, std::uint64_t rhs, 
     if (!compare) destination = result;
     state.rflags = (state.rflags & ~mask) | flags;
 }
+// Group-1 logical extensions: OR /1, AND /4, XOR /6.
+bool group_logical(unsigned extension) { return extension==1 || extension==4 || extension==6; }
+void group_logical32(CpuState& state, std::uint64_t& dst, std::uint32_t rhs, unsigned extension) {
+    const auto lhs=static_cast<std::uint32_t>(dst);
+    dst=extension==1 ? lhs|rhs : extension==4 ? lhs&rhs : lhs^rhs;
+    logical_test32(state,static_cast<std::uint32_t>(dst));
+}
+void group_logical64(CpuState& state, std::uint64_t& dst, std::uint64_t rhs, unsigned extension) {
+    if (extension==1) dst|=rhs; else if (extension==4) dst&=rhs; else dst^=rhs;
+    logical_test(state,dst);
+}
 }
 StepResult Cpu::step(Memory& memory) {
     std::array<std::uint8_t, 15> b{};
@@ -255,7 +266,7 @@ StepResult Cpu::step(Memory& memory) {
         const unsigned mod=b[1]>>6, reg=(b[1]>>3)&7, rm=b[1]&7;
         if (mod!=3) {
             if ((op32==0xc7 && reg!=0) ||
-                ((op32==0x81 || op32==0x83) && reg!=0 && reg!=5 && reg!=7)) return StepResult::invalid_instruction;
+                ((op32==0x81 || op32==0x83) && reg!=0 && reg!=5 && reg!=7 && !group_logical(reg))) return StepResult::invalid_instruction;
             std::uint64_t address=0; unsigned length=0;
             const unsigned trailing=(op32==0xc7 || op32==0x81)?4:(op32==0x83?1:0);
             if (!effective_address(memory,state,b,1,0,trailing,address,length)) return StepResult::memory_fault;
@@ -281,7 +292,8 @@ StepResult Cpu::step(Memory& memory) {
                     // Stage flags and result so a failed write does not change CPU state.
                     auto next=state;
                     std::uint64_t dst=to_reg ? *state.reg(reg) : value;
-                    if (op32==0x31 || op32==0x33 || op32==0x09 || op32==0x0b || op32==0x21 || op32==0x23) {
+                    if ((op32==0x81 || op32==0x83) && group_logical(reg)) group_logical32(next,dst,rhs,reg);
+                    else if (op32==0x31 || op32==0x33 || op32==0x09 || op32==0x0b || op32==0x21 || op32==0x23) {
                         dst=static_cast<std::uint32_t>(dst);
                         if (op32==0x31 || op32==0x33) dst^=rhs;
                         else if (op32==0x09 || op32==0x0b) dst|=rhs;
@@ -305,11 +317,13 @@ StepResult Cpu::step(Memory& memory) {
             *state.reg(rm)=little(b.data()+2,4); state.rip+=6; return StepResult::running;
         }
         if (op32==0x81 || op32==0x83) {
-            if (reg!=0 && reg!=5 && reg!=7) return StepResult::invalid_instruction;
+            if (reg!=0 && reg!=5 && reg!=7 && !group_logical(reg)) return StepResult::invalid_instruction;
             const unsigned width=op32==0x81?4:1, length=2+width;
             if (!memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
             const auto imm=little(b.data()+2,width);
-            arithmetic32(state,*state.reg(rm),static_cast<std::uint32_t>(width==1?sign_extend(imm,8):imm),reg!=0,reg==7);
+            const auto rhs=static_cast<std::uint32_t>(width==1?sign_extend(imm,8):imm);
+            if (group_logical(reg)) group_logical32(state,*state.reg(rm),rhs,reg);
+            else arithmetic32(state,*state.reg(rm),rhs,reg!=0,reg==7);
             state.rip+=length; return StepResult::running;
         }
         if (op32==0x85) {
@@ -367,7 +381,7 @@ StepResult Cpu::step(Memory& memory) {
     if (opcode==0x81 || opcode==0x83) { // REX.W group 1, sign-extended immediate
         if (!memory.fetch(state.rip,std::span(b).first(3))) return StepResult::memory_fault;
         const auto mod=b[2]>>6, extension=(b[2]>>3)&7;
-        if (extension!=0 && extension!=5 && extension!=7) return StepResult::invalid_instruction;
+        if (extension!=0 && extension!=5 && extension!=7 && !group_logical(extension)) return StepResult::invalid_instruction;
         const unsigned width=opcode==0x81?4:1;
         if (mod!=3) {
             std::uint64_t address=0; unsigned length=0;
@@ -375,14 +389,18 @@ StepResult Cpu::step(Memory& memory) {
             std::array<std::uint8_t,8> bytes{};
             if (!memory.read(address,bytes)) return StepResult::memory_fault;
             auto next=state; auto value=little(bytes.data(),8);
-            arithmetic(next,value,sign_extend(little(b.data()+length-width,width),width*8),extension!=0,extension==7);
+            const auto rhs=sign_extend(little(b.data()+length-width,width),width*8);
+            if (group_logical(extension)) group_logical64(next,value,rhs,extension);
+            else arithmetic(next,value,rhs,extension!=0,extension==7);
             if (extension!=7 && !memory.write(address,bytes64(value))) return StepResult::memory_fault;
             state=next; state.rip+=length; return StepResult::running;
         }
         const unsigned length=3+width;
         if (!memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
         const unsigned reg=(b[2]&7)+((b[0]&1)?8:0);
-        arithmetic(state,*state.reg(reg),sign_extend(little(b.data()+3,width),width*8),extension!=0,extension==7);
+        const auto rhs=sign_extend(little(b.data()+3,width),width*8);
+        if (group_logical(extension)) group_logical64(state,*state.reg(reg),rhs,extension);
+        else arithmetic(state,*state.reg(reg),rhs,extension!=0,extension==7);
         state.rip+=length;
         return StepResult::running;
     }

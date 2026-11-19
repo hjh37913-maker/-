@@ -29,8 +29,16 @@ Additional supported forms: unprefixed `09/0b/21/23` operate on 32-bit
 legacy registers and memory; `48..4f 09/0b/21/23` operate on 64-bit
 registers and memory including REX extensions. These implement OR and AND
 in both operand directions. Defined flags match logical TEST; undefined AF is
-preserved. Memory write faults leave state unchanged. LOCK, immediate forms,
-and non-REX.W 32-bit extended registers remain unsupported. A Linux x86-64
+preserved. Memory write faults leave state unchanged. LOCK and non-REX.W 32-bit extended registers remain unsupported. A Linux x86-64
 native differential test covers 36,864 register and memory cases, including
 both widths and operand directions. These instructions do not provide PS5
 compatibility.
+
+Group-1 `81` imm32 and `83` imm8 now also support logical OR /1, AND /4,
+and XOR /6 for unprefixed 32-bit and REX.W 64-bit register and memory
+operands. The 8-bit immediate sign-extends for both widths; imm32 sign-extends
+for 64-bit operands. Undefined AF is preserved; writes to 32-bit registers
+zero-extend. ADC /2, SBB /3 and LOCK remain unsupported. 49,152 cases compare
+the result and defined flags to equivalent native **register** instructions;
+the oracle does not execute the same immediate encoding or guest addresses.
+Portable checks cover truncation, RIP-relative operands and write failures.
