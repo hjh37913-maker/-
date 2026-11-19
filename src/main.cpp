@@ -6,6 +6,7 @@
 #include "loader/sce_import_inspect.h"
 #include "loader/sce_raw_reloc.h"
 #include "runtime/linux_process.h"
+#include "runtime/guest_services.h"
 #include <array>
 #include <charconv>
 #include <cstdint>
@@ -170,14 +171,16 @@ int linux_elf(const char* path,std::size_t budget,std::span<const std::string> a
 }
 
 // Explicit opt-in for trusted, independently authored, unprotected SCE-style
-// fixtures. No imports, dependencies, syscall ABI, host symbols or services
-// are supplied by this mode. It must not be used as a sandbox.
-int sce_raw(const char* path, std::size_t budget) {
+// fixtures. No real libraries, syscall ABI or host symbols are supplied.
+// Optional caller-asserted primitives are synthetic, not PS5 system libraries.
+// It must not be used as a sandbox.
+int sce_raw(const char* path, std::size_t budget, std::span<const std::string_view> service_specs={}) {
     constexpr std::size_t max_file=8*1024*1024;
     constexpr std::size_t guest_capacity=256*1024*1024, stack_size=64*1024;
     constexpr std::uint64_t bias=0x100000, stack_base=guest_capacity-stack_size;
     std::cout << "Experimental SCE-style raw ELF mode for trusted authored fixtures only.\n"
                  "No SELF/decryption, PS5 ABI, graphics or games are supported. Not a sandbox.\n";
+    if(!service_specs.empty()) std::cout << "Explicit synthetic SysV services only; not PS5 exports.\n";
     std::error_code ec;
     const auto size=std::filesystem::file_size(path,ec);
     if(ec || size==0 || size>max_file) {
@@ -189,13 +192,88 @@ int sce_raw(const char* path, std::size_t budget) {
         std::cerr << "Could not read the entire regular file.\n"; return 1;
     }
     nightfall::Machine machine(guest_capacity,nightfall::SparsePages{4096});
+    nightfall::runtime::GuestServices services;
+    std::vector<nightfall::loader::SceDependencyBinding> dependencies;
+    if(service_specs.size()>32) { std::cerr << "At most 32 synthetic service bindings and dependency assertions are allowed.\n"; return 2; }
+    for(std::size_t i=0;i<service_specs.size();++i) {
+        const auto spec=service_specs[i];
+        const auto separator=spec.find('=');
+        if(separator==std::string_view::npos || separator==0 || separator+1==spec.size()) {
+            std::cerr << "Each entry must be KIND=VALUE.\n"; return 2;
+        }
+        const auto kind=spec.substr(0,separator), symbol=spec.substr(separator+1);
+        if(kind=="module" || kind=="library") {
+            // Caller assertions about identity only, never library loading.
+            const auto a=symbol.find(':'), b=a==symbol.npos?symbol.npos:symbol.find(':',a+1);
+            const auto c=b==symbol.npos?symbol.npos:symbol.find(':',b+1);
+            if(a==symbol.npos || b==symbol.npos || (kind=="module" && c==symbol.npos)) {
+                std::cerr << "Dependency must be module=ID:MAJOR:MINOR:NAME or library=ID:MAJOR:NAME.\n"; return 2;
+            }
+            const auto parse16=[](std::string_view text,std::uint16_t& result) {
+                unsigned value=0;
+                const auto parsed=std::from_chars(text.data(),text.data()+text.size(),value);
+                if(text.empty() || parsed.ec!=std::errc{} || parsed.ptr!=text.data()+text.size() || value>65535)return false;
+                result=static_cast<std::uint16_t>(value);return true;
+            };
+            std::uint16_t id=0,major=0,minor=0;
+            const auto depname=kind=="module"?symbol.substr(c+1):symbol.substr(b+1);
+            if(!parse16(symbol.substr(0,a),id) || !parse16(symbol.substr(a+1,b-a-1),major) ||
+               (kind=="module" && !parse16(symbol.substr(b+1,c-b-1),minor)) ||
+               depname.empty() || depname.size()>255 ||
+               (kind=="module" && (major>255 || minor>255))) {
+                std::cerr << "Invalid dependency identity.\n"; return 2;
+            }
+            const auto depkind=kind=="module"?nightfall::loader::SceDependencyKind::module:nightfall::loader::SceDependencyKind::library;
+            dependencies.push_back({depkind,id,major,minor,depname});
+            continue;
+        }
+        using nightfall::runtime::ServiceKind;
+        ServiceKind selected;
+        if(kind=="copy")selected=ServiceKind::copy;
+        else if(kind=="move")selected=ServiceKind::move;
+        else if(kind=="fill")selected=ServiceKind::fill;
+        else if(kind=="compare")selected=ServiceKind::compare;
+        else if(kind=="strlen")selected=ServiceKind::string_length;
+        else { std::cerr << "Unknown synthetic service kind.\n"; return 2; }
+        if(!services.add(std::string(symbol),0x1000+i,selected)) {
+            std::cerr << "Invalid or duplicate service binding.\n"; return 2;
+        }
+    }
+    const auto bindings=services.bindings();
     std::string missing;
-    const auto status=nightfall::loader::load_sce_raw_relocatable(input.bytes,machine,bias,stack_base,stack_size,{},&missing);
+    const auto status=nightfall::loader::load_sce_raw_relocatable(input.bytes,machine,bias,stack_base,stack_size,bindings,&missing,dependencies);
     if(status!=nightfall::loader::ElfStatus::ok) {
         std::cerr << "Raw ELF rejected: " << nightfall::loader::elf_status_name(status);
         if(!missing.empty()) std::cerr << " (unresolved: " << escaped_symbol(missing) << ")";
-        std::cerr << "\nNo libraries or imports are supplied in this mode.\n";
+        std::cerr << "\nOnly explicitly supplied synthetic bindings and dependency assertions are available; no libraries are loaded.\n";
         return 1;
+    }
+    if(!service_specs.empty()) {
+        // Trap addresses live below the fixed image bias, and must remain unmapped.
+        for(const auto& binding:bindings) {
+            if(machine.memory.can_access(binding.guest_address,1,nightfall::Permission::none)) {
+                std::cerr << "Synthetic trap address overlaps guest memory.\n"; return 1;
+            }
+        }
+        const auto report=nightfall::runtime::run_with_services(machine,services,budget);
+        using nightfall::runtime::GuestRunResult;
+        const char* result="unknown";
+        switch(report.result) {
+        case GuestRunResult::budget_exhausted: result="budget_exhausted"; break;
+        case GuestRunResult::halted: result="halted"; break;
+        case GuestRunResult::syscall_trap: result="syscall_trap"; break;
+        case GuestRunResult::invalid_instruction: result="invalid_instruction"; break;
+        case GuestRunResult::memory_fault: result="memory_fault"; break;
+        case GuestRunResult::divide_error: result="divide_error"; break;
+        case GuestRunResult::alignment_fault: result="alignment_fault"; break;
+        case GuestRunResult::service_limit: result="service_limit"; break;
+        case GuestRunResult::unsupported_service: result="unsupported_service"; break;
+        }
+        std::cout << "Experimental guest stopped: " << result << " RAX=" << machine.cpu.state.rax
+                  << " RIP=" << machine.cpu.state.rip << "\nExecution steps attempted=" << report.attempted
+                  << " stop RIP=" << report.stop_rip << '\n';
+        if(report.result==GuestRunResult::syscall_trap) std::cerr << "System calls are not implemented in this mode.\n";
+        return report.result==GuestRunResult::halted?0:1;
     }
     const auto report=machine.run_detailed(budget);
     std::cout << "Experimental guest stopped: " << name(report.result)
@@ -271,6 +349,20 @@ int main(int argc,char** argv) {
             std::vector<std::string> args{"nightfall-guest"};
             for(int i=4;i<argc;++i) args.emplace_back(argv[i]);
             return linux_elf(argv[2],budget,args,std::string_view(argv[1])=="--run-linux-elf-stdin",std::string_view(argv[1])=="--run-linux-elf-fixture",std::string_view(argv[1])=="--run-linux-static-pie");
+        }
+        if (std::string_view(argv[1])=="--run-sce-raw-services") {
+            if(argc<5 || argc>36) {
+                std::cerr << "Usage: nightfall_cli --run-sce-raw-services trusted-fixture budget KIND=VALUE [...]\n"; return 2;
+            }
+            std::size_t budget=0;
+            const std::string_view value(argv[3]);
+            const auto parsed=std::from_chars(value.data(),value.data()+value.size(),budget);
+            if(value.empty() || parsed.ec!=std::errc{} || parsed.ptr!=value.data()+value.size() || !budget || budget>max_budget) {
+                std::cerr << "Budget must be an integer from 1 to " << max_budget << ".\n"; return 2;
+            }
+            std::vector<std::string_view> specs;
+            for(int i=4;i<argc;++i)specs.emplace_back(argv[i]);
+            return sce_raw(argv[2],budget,specs);
         }
         if (std::string_view(argv[1])=="--run-sce-raw") {
             if(argc<3 || argc>4) { std::cerr << "Usage: nightfall_cli --run-sce-raw trusted-original-fixture [instruction-budget]\n"; return 2; }

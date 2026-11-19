@@ -84,8 +84,11 @@ ElfStatus load_sce_raw_relocatable(std::span<const std::uint8_t> file,Machine& m
  }
  auto relocate=[&](std::uint64_t table,std::uint64_t length)->ElfStatus{
   for(std::uint64_t n=0;n<length;n+=24){const auto p=static_cast<std::size_t>(data+table+n),target=le(file,p,8),info=le(file,p+8,8),addend=le(file,p+16,8);const auto kind=static_cast<std::uint32_t>(info);const auto index=info>>32;std::uint64_t value=0;
+   // R_X86_64_NONE has no target and performs no write.
+   if(kind==0)continue;
+   const bool narrow=(kind==2||kind==4||kind==10||kind==11);
    if(kind==8&&index==0)value=bias+addend;
-   else if((kind==1||kind==6||kind==7)&&index>0&&index<symsz.value/24){
+   else if((kind==1||kind==2||kind==4||kind==6||kind==7||kind==10||kind==11)&&index>0&&index<symsz.value/24){
     const auto pos=static_cast<std::size_t>(data+sym.value+index*24),nameoff=le(file,pos,4);const auto info_byte=file[pos+4],visibility=file[pos+5];const auto section=le(file,pos+6,2),symvalue=le(file,pos+8,8);const auto binding=info_byte>>4,stype=info_byte&15;
     if((binding!=0&&binding!=1&&binding!=2)||stype>2||visibility>3||section>=0xff00)return ElfStatus::unsupported;
     if(!section){if(binding==0||visibility!=0||nameoff>=strsz.value)return ElfStatus::malformed;
@@ -103,11 +106,18 @@ ElfStatus load_sce_raw_relocatable(std::span<const std::uint8_t> file,Machine& m
      for(const auto& item:bindings)if(item.name==name){value=item.guest_address;found=true;break;}
      if(!found){if(missing)missing->assign(name);return ElfStatus::unresolved_symbol;}
     }else{bool inside=false;for(const auto& s:segments)if(symvalue>=s.address&&fits(symvalue-s.address,1,s.memsz)){inside=true;break;}if(!inside||!add(bias,symvalue,value))return ElfStatus::malformed;}
-    if(kind==1)value+=addend;
+    if(kind==1||narrow)value+=addend;
    }else return ElfStatus::unsupported;
-   bool writable=false;for(const auto& s:segments)if((s.flags&2)&&target>=s.address&&fits(target-s.address,8,s.memsz)){writable=true;break;}
+   const std::size_t width=narrow?4:8;
+   bool writable=false;for(const auto& s:segments)if((s.flags&2)&&target>=s.address&&fits(target-s.address,width,s.memsz)){writable=true;break;}
    std::uint64_t address=0;if(!writable||!add(bias,target,address))return ElfStatus::malformed;
-   std::array<std::uint8_t,8> bytes{};for(unsigned j=0;j<8;++j)bytes[j]=static_cast<std::uint8_t>(value>>(8*j));if(!staged.write(address,bytes))return ElfStatus::malformed;
+   // PC32/PLT32 use S+A-P. 32 and 32S use S+A. Arithmetic is
+   // modulo 2^64; reject values that do not round-trip through the
+   // specified 32-bit zero or sign extension instead of truncating.
+   if(kind==2||kind==4)value-=address;
+   if(kind==10&&value>UINT32_MAX)return ElfStatus::range_error;
+   if((kind==2||kind==4||kind==11)&&value>0x7fffffffULL&&value<0xffffffff80000000ULL)return ElfStatus::range_error;
+   std::array<std::uint8_t,8> bytes{};for(std::size_t j=0;j<width;++j)bytes[j]=static_cast<std::uint8_t>(value>>(8*j));if(!staged.write(address,std::span<const std::uint8_t>(bytes.data(),width)))return ElfStatus::malformed;
   }return ElfStatus::ok;
  };
  if(rela.seen){const auto r=relocate(rela.value,relasz.value);if(r!=ElfStatus::ok)return r;}

@@ -20,6 +20,15 @@
 | Coverage | Measured, limited | 156 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
+## New raw relocation and service bindings (unverified)
+
+The synthetic raw loader now has experimental generic x86-64 NONE, PC32,
+PLT32, 32 and 32S relocations; explicit synthetic service bindings can be
+provided via `--run-sce-raw-services`, together with optional caller-asserted
+dependency identities. Assertions do not load libraries. New behavior was compiled but not
+executed or tested at the user's request. It is not verified PS5 behavior,
+system libraries, a game loader, a sandbox, or evidence GTA VI can run.
+
 ## Raw SCE-style fixture CLI (unverified)
 
 `--run-sce-raw` exposes the restricted experimental raw loader and bounded CPU

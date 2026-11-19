@@ -74,10 +74,36 @@ execution to at most one million instruction steps. A 64 KiB stack and fixed
 0x100000 load bias are used. A normal CPU stop or loader error is reported;
 missing symbol/dependency names are escaped before terminal output.
 
-The command supplies **no** import bindings, libraries, syscall ABI, guest
-services, firmware, SELF support, decryption, PS5 graphics or game support.
+The basic `--run-sce-raw` command supplies **no** import bindings, libraries,
+syscall ABI, guest services, firmware, SELF support, decryption, PS5 graphics
+or game support.
 Dependencies and unresolved imports are rejected; syscalls trap. Successful
 loading or HLT does not demonstrate platform or game compatibility. File paths
 are not isolated, file reads may race, and this interpreter is not a sandbox;
 do not run untrusted files. This command has been compiled on Linux and
 cross-compiled for Windows x64, but has not been executed or tested.
+
+### Explicit synthetic service bindings (unverified)
+
+`--run-sce-raw-services FILE BUDGET KIND=SYMBOL [...]` is a separate opt-in
+variant for trusted authored fixtures. It supplies only the specified exact
+symbol names, binding each to a guest trap for an existing bounded SysV
+primitive: `copy`, `move`, `fill`, `compare`, or `strlen`. Quote symbol names
+containing shell-special characters. At most 32 service or dependency entries are accepted; duplicate service names
+or duplicate dependency IDs of the same kind fail. Services and addresses are
+caller assertions, not automatic PS5 NID resolution or PS5 library
+implementations. They provide no syscalls, file I/O, graphics or process
+startup ABI. Dependency metadata may be asserted explicitly as
+`module=ID:MAJOR:MINOR:NAME` or `library=ID:MAJOR:NAME` with decimal IDs and
+versions. Such assertions only match metadata; they do **not** load libraries
+or implement their functions. Unmatched imports and unprovided module/library
+identities still fail. The trap range is below the
+image bias and checked for overlap. No external host function is bound.
+
+The raw SCE-style loader additionally implements generic x86-64 relocation
+kinds NONE, PC32, PLT32, 32 and 32S for its existing restricted format, with
+32-bit extension checks, writable-target requirements and staged rollback.
+These new relocation kinds and the service CLI are **not tested**, and their
+behavior or use in actual PS5 executables is **not established**. They do not
+provide a working PS5 dynamic linker. The loader still rejects text relocations,
+TLS, unknown tags and other unsupported features. Do not run untrusted files.
