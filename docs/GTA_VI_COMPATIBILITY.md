@@ -1,0 +1,3 @@
+# GTA VI compatibility
+
+Status: **NOT_IMPLEMENTED / not runnable**. No game supplied or tested; no launch control exists. There is no supported lawful ingestion path, executable loader, PS5 ABI, GPU command/shader translation, required runtime services, input, or demonstrated performance. Exact requirements and dependencies are unknown; public product specifications are not compatibility evidence. A license alone does not provide technical access. No copyrighted assets are distributed and no DRM or security mechanisms are bypassed. Test history: none; performance: unmeasured. The synthetic test is not game compatibility evidence.

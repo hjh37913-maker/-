@@ -1,0 +1,123 @@
+# Original raw test program
+
+`register-demo.bin` is an independently authored 20-byte instruction sequence, not a game or executable file format:
+
+```text
+49 b8 07 00 00 00 00 00 00 00   mov r8, 7
+4c 89 c1                        mov rcx, r8
+4c 01 c1                        add rcx, r8
+48 89 c8                        mov rax, rcx
+f4                              synthetic halt sentinel
+```
+
+After building, run `./build/nightfall_cli --run-raw examples/register-demo.bin 5` (for a Windows multi-config build: `build/Debug/nightfall_cli.exe --run-raw examples/register-demo.bin 5`). Expected: halted, RAX=14, RIP=20. Raw means bytes only, not an ELF/PE/PS5 loader. Only run original test files: this interpreter is not a security sandbox and does not support protected content. Guest instruction budget defaults to 10,000 and must be between 1 and 1,000,000. Input is limited to 65,536 bytes, loaded at address zero; file-backed bytes become read/execute and the remainder is readable and writable, not executable. No PS5 binary is supported.
+
+## Memory test
+`memory-demo.bin` is an independently authored 27-byte sequence: `mov rbx, 128`, `mov r8, 42`, `mov [rbx], r8`, `mov rax, [rbx]`, synthetic HLT. Run `./build/nightfall_cli --run-raw examples/memory-demo.bin 5`; expected RAX=42, RIP=27. The guest data area is intentionally writable; no host sandboxing is implied.
+
+## Stack and call test
+`stack-demo.bin` is an original sequence: MOV RAX,40; CALL rel32; HLT; ADD RAX,2; RET. The raw test CLI initializes RSP to 65,536. Run `./build/nightfall_cli --run-raw examples/stack-demo.bin 5`; expected halted with RAX=42. Stack data is in the writable non-executable portion of the synthetic address space when the input does not occupy it.
+
+## ELF test
+`elf-demo.s` is original assembly; `elf-demo.elf` is the corresponding x86-64 GNU-binutils-built ET_EXEC fixture. Run `./build/nightfall_cli --run-elf examples/elf-demo.elf 5` to execute the independent MOV/CALL/ADD/RET/HLT sequence, expected RAX=42. The loader is intentionally restricted; see ../docs/ELF_LOADER.md.
+
+## Freestanding C fixture
+`compiler-demo.c` is an original freestanding C program. `compiler-demo.elf` was built on Linux with GCC 12.2 and GNU ld using:
+
+```sh
+gcc -O1 -ffreestanding -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables -fno-unwind-tables -nostdlib -no-pie -Wl,-Ttext=0x1000 -Wl,-e,_start -Wl,--build-id=none -o compiler-demo.elf compiler-demo.c
+./build/nightfall_cli --run-elf examples/compiler-demo.elf 20
+```
+
+The C compiler and linker versions or flags may generate different instructions and a different binary. This example uses the interpreter's synthetic HLT sentinel: **do not execute the ELF directly on the host**. Expected interpreter result is RAX=42. No libc, syscalls or guest ABI are involved.
+
+## Freestanding C loop
+`loop-demo.c` and its original GCC 12.2 `loop-demo.elf` exercise a function call, register TEST, conditional branches and a loop. Build with the same GCC flags as the previous C fixture, changing the input and output names. Run `./build/nightfall_cli --run-elf examples/loop-demo.elf 100`; expected RAX=45. The ELF uses synthetic HLT; **do not execute it directly on the host**. No libc, syscalls or PS5 services are involved.
+
+## 32-bit C loop
+`int-loop-demo.c` and `int-loop-demo.elf` are original GCC 12.2 freestanding examples using 32-bit unsigned arithmetic. Build with the same flags as the other C example, changing input and output names. Run `./build/nightfall_cli --run-elf examples/int-loop-demo.elf 100`; expected RAX=45. This file uses the synthetic HLT sentinel: **do not execute it directly on the host**. No operating-system or PS5 interfaces are exercised.
+
+## 32-bit array fixture
+`array-demo.c` and `array-demo.elf` are an original freestanding C example compiled using GCC 12.2 and the same flags as above. The function uses local 32-bit values and returns 42. Run `./build/nightfall_cli --run-elf examples/array-demo.elf 100`. The ELF uses the synthetic HLT sentinel: **do not execute it directly on the host**. No OS or PS5 interface is exercised.
+
+## Memory arithmetic fixture
+`memory-arithmetic-demo.c` uses explicit inline x86 assembly for 32-bit memory ADD/SUB/CMP, compiled with GCC 12.2 using the same freestanding flags as the array fixture. Run `./build/nightfall_cli --run-elf examples/memory-arithmetic-demo.elf 100` and expect RAX=42 at synthetic HLT. Do not execute the ELF directly on the host. It does not exercise any OS or console interface.
+
+## XOR C fixture
+`xor-demo.c` uses ordinary C XOR and is compiled with GCC 12.2 and the freestanding flags shown above. Run `./build/nightfall_cli --run-elf examples/xor-demo.elf 100`; expected RAX=42. It uses the synthetic HLT sentinel: **do not execute the ELF directly on the host**. This is not a console or operating-system program.
+
+## 64-bit memory arithmetic fixture
+`memory64-demo.c` uses explicit inline x86 assembly for 64-bit memory ADD/SUB/CMP; GCC 12.2 generates an additional sign-extended MOV immediate. Build with the same freestanding flags as above. `./build/nightfall_cli --run-elf examples/memory64-demo.elf 100` halts with RAX=42. The ELF uses the synthetic HLT sentinel: **do not execute directly on the host**. No OS or PS5 interface is involved.
+
+## Immediate-32 group arithmetic fixture
+`imm32-demo.c` uses explicit inline assembly for 64-bit memory arithmetic with values too large for imm8, compiled with GCC 12.2 using the freestanding flags above. `./build/nightfall_cli --run-elf examples/imm32-demo.elf 100` halts with RAX=42. It uses synthetic HLT: **do not execute directly on the host**. No OS or console interface is exercised.
+
+## Function pointer and failure diagnostics
+`indirect-call.c` is a freestanding C example using a volatile function pointer, compiled with GCC 12.2 and the flags above. Run `./build/nightfall_cli --run-elf examples/indirect-call.elf 100`; expected RAX=42. Its synthetic HLT must **not** be executed directly on the host.
+
+`unsupported-demo.bin` is original raw bytes `0f 0b`; it demonstrates an unsupported instruction. `./build/nightfall_cli --run-raw examples/unsupported-demo.bin 10` exits with code 1 and prints the stopping RIP and executable bytes. Reported bytes are a bounded memory snapshot, not a decoded instruction; memory faults may originate in data access.
+
+## AND/OR C fixture
+`and-or-demo.c` is an original freestanding C example using 32-bit register
+AND and OR. It was built with GCC 12.2 using the flags above. Run
+`./build/nightfall_cli --run-elf examples/and-or-demo.elf 100`: the interpreter
+should halt with RAX=42. The synthetic HLT is **not safe to execute on the
+host**. This does not test an OS, PS5 runtime or a game.
+
+## Logical immediate C fixture
+`logical-immediate-demo.c` and its GCC 12.2 compiled ELF exercise the OR,
+XOR and AND imm8 register forms. Build using the freestanding flags above;
+`./build/nightfall_cli --run-elf examples/logical-immediate-demo.elf 100`
+halts with RAX=42. This original test includes synthetic HLT and must **not**
+be executed directly on the host. It does not exercise OS or PS5 services.
+
+## Zero-extension C fixture
+`movzx-demo.c` is an original freestanding program with an 8-bit read,
+compiled using GCC 12.2 and the flags above. `nightfall_cli --run-elf
+examples/movzx-demo.elf 100` stops at synthetic HLT with RAX=42. **Do not
+execute the ELF on the host**. This does not exercise a console runtime.
+
+## Signed extension and byte transfer fixtures
+`movsx-demo.c` sums original signed byte, short, and int values to 42; the
+GCC 12.2 ELF exercises MOVSX and MOVSXD. `mov8-demo.c` writes a byte to a
+volatile location and reads it back (42). `byte-loop-demo.c` copies three
+signed bytes and returns their sum, 42; GCC 12.2 unrolled the loop in the
+checked-in ELF. The integration test checks both the return value and the
+three guest-memory output bytes. Build with the freestanding flags above.
+These files contain synthetic HLT and **must not be executed on the host**.
+They are original test programs, not PS5 software.
+
+## Shifts, word transfers and sparse-address fixtures
+`shift-demo.elf` uses CL-driven shifts; `inc-dec-demo.elf` and
+`not-neg-demo.elf` use explicit inline x86 instructions; `mov16-demo.elf`
+transfers a 16-bit value. Each original freestanding program stops at the
+interpreter's synthetic HLT with RAX=42. Build using the GCC flags above.
+`high-address-demo.elf` is assembled from the included source at guest address
+0x100000000; build using `as --64 examples/high-address-demo.s -o high.o` and
+`ld -Ttext=0x100000000 -e _start --build-id=none -o high.elf high.o`. On a
+64-bit host, `nightfall_cli --run-elf-sparse high.elf 5` stops with RAX=42.
+These programs contain synthetic HLT and **must not be run on the host**. No
+PS5 ABI or real game software is exercised.
+
+### Original dynamic relocation fixtures (Linux x86-64, GNU binutils)
+
+These are self-authored, unprotected research files, not game or PS5 binaries.
+Never run `static-pie-reloc.elf` directly on the host: it requires relocations
+but has no PT_INTERP or self-relocator. The distinct `pie-native-reloc.elf`
+uses the Linux dynamic linker. Regenerate on Linux:
+
+```sh
+as --64 examples/static-pie-reloc.s -o /tmp/static-pie-reloc.o
+ld -pie --no-dynamic-linker -z norelro -z noexecstack --build-id=none /tmp/static-pie-reloc.o -o examples/static-pie-reloc.elf
+ld -pie --dynamic-linker /lib64/ld-linux-x86-64.so.2 -z norelro -z noexecstack --build-id=none /tmp/static-pie-reloc.o -o examples/pie-native-reloc.elf
+as --64 examples/elf-local-symbol.s -o /tmp/elf-local-symbol.o
+ld -shared -z norelro -e _start --build-id=none /tmp/elf-local-symbol.o -o examples/elf-local-symbol.so
+as --64 examples/elf-import-consumer.s -o /tmp/elf-import-consumer.o
+ld -shared -z norelro -e _start --build-id=none /tmp/elf-import-consumer.o -o examples/elf-import-consumer.so
+as --64 examples/elf-import-provider.s -o /tmp/elf-import-provider.o
+ld -shared -z norelro --build-id=none /tmp/elf-import-provider.o -o examples/elf-import-provider.so
+```
+
+The `.so` files are used as original ELF test inputs by this project; Linux
+native oracle tests use `dlopen`, not direct host execution. Regeneration can
+vary with binutils version. None is a PS5 library, game or DRM component.

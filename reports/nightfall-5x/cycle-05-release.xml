@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Linux-c++"
+	tests="37"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname="e2b.local"
+	time="0"
+	timestamp="2026-11-19T10:18:54"
+	>
+	<testcase name="cli_memory_arithmetic_elf_demo" classname="cli_memory_arithmetic_elf_demo" time="0.00412535" status="run">
+		<properties/>
+		<system-out>Experimental ELF64 test program: halted RAX=42 RIP=4124
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="cli_array_elf_demo" classname="cli_array_elf_demo" time="0.0037891" status="run">
+		<properties/>
+		<system-out>Experimental ELF64 test program: halted RAX=42 RIP=4158
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="cli_int_loop_elf_demo" classname="cli_int_loop_elf_demo" time="0.00350236" status="run">
+		<properties/>
+		<system-out>Experimental ELF64 test program: halted RAX=45 RIP=4144
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="cli_loop_elf_demo" classname="cli_loop_elf_demo" time="0.00347606" status="run">
+		<properties/>
+		<system-out>Experimental ELF64 test program: halted RAX=45 RIP=4145
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="cli_compiler_elf_demo" classname="cli_compiler_elf_demo" time="0.00345545" status="run">
+		<properties/>
+		<system-out>Experimental ELF64 test program: halted RAX=42 RIP=4131
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="cli_elf_demo" classname="cli_elf_demo" time="0.00329901" status="run">
+		<properties/>
+		<system-out>Experimental ELF64 test program: halted RAX=42 RIP=4112
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="cli_raw_demo" classname="cli_raw_demo" time="0.00193461" status="run">
+		<properties/>
+		<system-out>Experimental raw test program: halted RAX=14 RIP=20
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="cli_raw_memory_demo" classname="cli_raw_memory_demo" time="0.00211824" status="run">
+		<properties/>
+		<system-out>Experimental raw test program: halted RAX=42 RIP=27
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="cli_raw_stack_demo" classname="cli_raw_stack_demo" time="0.00200082" status="run">
+		<properties/>
+		<system-out>Experimental raw test program: halted RAX=42 RIP=16
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="cli_raw_bad_budget" classname="cli_raw_bad_budget" time="0.00182635" status="run">
+		<properties/>
+		<system-out>Budget must be an integer from 1 to 1000000.
+</system-out>
+	</testcase>
+	<testcase name="cli_raw_missing" classname="cli_raw_missing" time="0.001756" status="run">
+		<properties/>
+		<system-out>Cannot use file: must be a nonempty regular test file of at most 65536 bytes.
+</system-out>
+	</testcase>
+	<testcase name="cli_raw_budget_exhausted" classname="cli_raw_budget_exhausted" time="0.00191698" status="run">
+		<properties/>
+		<system-out>Experimental raw test program: budget_exhausted RAX=0 RIP=10
+PS5 software and GTA VI are not supported.
+</system-out>
+	</testcase>
+	<testcase name="nightfall_tests" classname="nightfall_tests" time="0.00172777" status="run">
+		<properties/>
+		<system-out>All checks passed
+</system-out>
+	</testcase>
+	<testcase name="memory_mapping_tests" classname="memory_mapping_tests" time="0.00181622" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cpu_fault_tests" classname="cpu_fault_tests" time="0.00177849" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cpu_branch_tests" classname="cpu_branch_tests" time="0.00183699" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="storage_tests" classname="storage_tests" time="0.00205361" status="run">
+		<properties/>
+		<system-out>40 storage and integration checks passed
+</system-out>
+	</testcase>
+	<testcase name="input_tests" classname="input_tests" time="0.00191335" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="memory_model_tests" classname="memory_model_tests" time="0.0228568" status="run">
+		<properties/>
+		<system-out>operation 0: 1503 success, 6647 failure
+operation 1: 801 success, 7469 failure
+operation 2: 681 success, 7758 failure
+operation 3: 1172 success, 7193 failure
+operation 4: 1172 success, 7210 failure
+operation 5: 1127 success, 7267 failure
+100 reproducible memory-model scenarios, 500 operations each passed
+</system-out>
+	</testcase>
+	<testcase name="graphics_tests" classname="graphics_tests" time="0.00630965" status="run">
+		<properties/>
+		<system-out>100 deterministic scenarios, 200 batches each: 7200 accepted, 12800 rejected; 13409 clears, 13297 fills, 13389 copies generated
+</system-out>
+	</testcase>
+	<testcase name="runtime_timer_tests" classname="runtime_timer_tests" time="0.00706261" status="run">
+		<properties/>
+		<system-out>100 scenarios, 1000 operations each; scheduled=26816 full=6379 cancelled=13742 advanced=33420
+</system-out>
+	</testcase>
+	<testcase name="system_integration_tests" classname="system_integration_tests" time="0.00184865" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cpu_register_tests" classname="cpu_register_tests" time="0.00183337" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cpu_memory_mov_tests" classname="cpu_memory_mov_tests" time="0.00198738" status="run">
+		<properties/>
+		<system-out>1280 register/base/direction/addressing combinations passed
+</system-out>
+	</testcase>
+	<testcase name="cpu_address_stack_tests" classname="cpu_address_stack_tests" time="0.00182042" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="elf_loader_tests" classname="elf_loader_tests" time="0.00298493" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cpu_compiled_instructions_tests" classname="cpu_compiled_instructions_tests" time="0.00180997" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cpu_jcc_tests" classname="cpu_jcc_tests" time="0.00202509" status="run">
+		<properties/>
+		<system-out>1024 conditional branch/flag cases passed
+</system-out>
+	</testcase>
+	<testcase name="cpu32_tests" classname="cpu32_tests" time="0.00176532" status="run">
+		<properties/>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="cpu32_memory_arithmetic_tests" classname="cpu32_memory_arithmetic_tests" time="0.00800551" status="run">
+		<properties/>
+		<system-out>29440 memory/register cross-checks passed
+</system-out>
+	</testcase>
+	<testcase name="cpu32_memory_tests" classname="cpu32_memory_tests" time="0.00187395" status="run">
+		<properties/>
+		<system-out>320 32-bit memory register/base/mode combinations passed
+</system-out>
+	</testcase>
+	<testcase name="cpu_add_differential" classname="cpu_add_differential" time="0.00365614" status="run">
+		<properties/>
+		<system-out>20108 native differential ADD cases passed
+</system-out>
+	</testcase>
+	<testcase name="cpu_sub_cmp_differential" classname="cpu_sub_cmp_differential" time="0.00542033" status="run">
+		<properties/>
+		<system-out>40216 native differential SUB and CMP cases passed
+</system-out>
+	</testcase>
+	<testcase name="cpu_register_differential" classname="cpu_register_differential" time="0.0049874" status="run">
+		<properties/>
+		<system-out>32768 register instruction differential cases passed
+</system-out>
+	</testcase>
+	<testcase name="cpu_imm8_differential" classname="cpu_imm8_differential" time="0.00338737" status="run">
+		<properties/>
+		<system-out>12288 native imm8 differential cases passed
+</system-out>
+	</testcase>
+	<testcase name="cpu_test_differential" classname="cpu_test_differential" time="0.00258003" status="run">
+		<properties/>
+		<system-out>8192 native TEST differential cases passed
+</system-out>
+	</testcase>
+	<testcase name="cpu32_differential" classname="cpu32_differential" time="0.00293695" status="run">
+		<properties/>
+		<system-out>15360 32-bit register/immediate differential cases passed
+</system-out>
+	</testcase>
+</testsuite>

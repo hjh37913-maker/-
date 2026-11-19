@@ -1,0 +1,6 @@
+/build*/
+*.zip
+__pycache__/
+node_modules/
+NIGHTFALL-Windows-Demo.exe
+NIGHTFALL-Android-Demo.apk

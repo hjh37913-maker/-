@@ -1,0 +1,10 @@
+{
+  "binary_sha256": "a2101da7b7f9790992be58406c8787f4a439bfe9d35f4adabc08286778e9b33d",
+  "seed_start": 381991,
+  "batches": 2381,
+  "comparisons_per_batch": 5000,
+  "total_comparisons": 11905000,
+  "elapsed_seconds": 1000.054,
+  "finished_utc": "2026-11-19T18:22:57.043138+00:00",
+  "oracle_output": "5000 synthetic SCE-style relocation comparisons against arithmetic model passed"
+}

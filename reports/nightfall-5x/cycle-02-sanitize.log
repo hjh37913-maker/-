@@ -1,0 +1,352 @@
+
+$ cmake -S . -B build-verify-sanitize -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined
+-- Configuring done (0.0s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/user/-/build-verify-sanitize
+
+$ cmake --build build-verify-sanitize --parallel 2
+[ 14%] Built target nightfall
+[ 20%] Built target nightfall_graphics_demo
+[ 20%] Built target nightfall_cli
+[ 26%] Built target memory_mapping_tests
+[ 26%] Built target nightfall_tests
+[ 33%] Built target cpu_fault_tests
+[ 33%] Built target cpu_branch_tests
+[ 39%] Built target storage_tests
+[ 39%] Built target input_tests
+[ 42%] Built target graphics_tests
+[ 46%] Built target memory_model_tests
+[ 52%] Built target runtime_timer_tests
+[ 52%] Built target system_integration_tests
+[ 55%] Built target cpu_memory_mov_tests
+[ 58%] Built target cpu_register_tests
+[ 65%] Built target elf_loader_tests
+[ 65%] Built target cpu_address_stack_tests
+[ 71%] Built target cpu_compiled_instructions_tests
+[ 71%] Built target cpu_jcc_tests
+[ 77%] Built target cpu32_memory_arithmetic_tests
+[ 77%] Built target cpu32_tests
+[ 80%] Built target cpu32_memory_tests
+[ 84%] Built target cpu_add_differential
+[ 88%] Built target cpu_register_differential
+[ 90%] Built target cpu_sub_cmp_differential
+[ 96%] Built target cpu_imm8_differential
+[ 96%] Built target cpu_test_differential
+[100%] Built target cpu32_differential
+
+$ ctest --test-dir build-verify-sanitize --verbose --output-junit /home/user/-/reports/nightfall-5x/cycle-02-sanitize.xml
+UpdateCTestConfiguration  from :/home/user/-/build-verify-sanitize/DartConfiguration.tcl
+Parse Config file:/home/user/-/build-verify-sanitize/DartConfiguration.tcl
+Test project /home/user/-/build-verify-sanitize
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+      Start  1: cli_memory_arithmetic_elf_demo
+
+1: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-elf" "/home/user/-/examples/memory-arithmetic-demo.elf" "100"
+1: Working Directory: /home/user/-/build-verify-sanitize
+1: Test timeout computed to be: 1500
+1: Experimental ELF64 test program: halted RAX=42 RIP=4124
+1: PS5 software and GTA VI are not supported.
+ 1/37 Test  #1: cli_memory_arithmetic_elf_demo ....   Passed    0.01 sec
+test 2
+      Start  2: cli_array_elf_demo
+
+2: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-elf" "/home/user/-/examples/array-demo.elf" "100"
+2: Working Directory: /home/user/-/build-verify-sanitize
+2: Test timeout computed to be: 1500
+2: Experimental ELF64 test program: halted RAX=42 RIP=4158
+2: PS5 software and GTA VI are not supported.
+ 2/37 Test  #2: cli_array_elf_demo ................   Passed    0.01 sec
+test 3
+      Start  3: cli_int_loop_elf_demo
+
+3: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-elf" "/home/user/-/examples/int-loop-demo.elf" "100"
+3: Working Directory: /home/user/-/build-verify-sanitize
+3: Test timeout computed to be: 1500
+3: Experimental ELF64 test program: halted RAX=45 RIP=4144
+3: PS5 software and GTA VI are not supported.
+ 3/37 Test  #3: cli_int_loop_elf_demo .............   Passed    0.01 sec
+test 4
+      Start  4: cli_loop_elf_demo
+
+4: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-elf" "/home/user/-/examples/loop-demo.elf" "100"
+4: Working Directory: /home/user/-/build-verify-sanitize
+4: Test timeout computed to be: 1500
+4: Experimental ELF64 test program: halted RAX=45 RIP=4145
+4: PS5 software and GTA VI are not supported.
+ 4/37 Test  #4: cli_loop_elf_demo .................   Passed    0.01 sec
+test 5
+      Start  5: cli_compiler_elf_demo
+
+5: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-elf" "/home/user/-/examples/compiler-demo.elf" "20"
+5: Working Directory: /home/user/-/build-verify-sanitize
+5: Test timeout computed to be: 1500
+5: Experimental ELF64 test program: halted RAX=42 RIP=4131
+5: PS5 software and GTA VI are not supported.
+ 5/37 Test  #5: cli_compiler_elf_demo .............   Passed    0.01 sec
+test 6
+      Start  6: cli_elf_demo
+
+6: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-elf" "/home/user/-/examples/elf-demo.elf" "5"
+6: Working Directory: /home/user/-/build-verify-sanitize
+6: Test timeout computed to be: 1500
+6: Experimental ELF64 test program: halted RAX=42 RIP=4112
+6: PS5 software and GTA VI are not supported.
+ 6/37 Test  #6: cli_elf_demo ......................   Passed    0.01 sec
+test 7
+      Start  7: cli_raw_demo
+
+7: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-raw" "/home/user/-/examples/register-demo.bin" "5"
+7: Working Directory: /home/user/-/build-verify-sanitize
+7: Test timeout computed to be: 1500
+7: Experimental raw test program: halted RAX=14 RIP=20
+7: PS5 software and GTA VI are not supported.
+ 7/37 Test  #7: cli_raw_demo ......................   Passed    0.01 sec
+test 8
+      Start  8: cli_raw_memory_demo
+
+8: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-raw" "/home/user/-/examples/memory-demo.bin" "5"
+8: Working Directory: /home/user/-/build-verify-sanitize
+8: Test timeout computed to be: 1500
+8: Experimental raw test program: halted RAX=42 RIP=27
+8: PS5 software and GTA VI are not supported.
+ 8/37 Test  #8: cli_raw_memory_demo ...............   Passed    0.01 sec
+test 9
+      Start  9: cli_raw_stack_demo
+
+9: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-raw" "/home/user/-/examples/stack-demo.bin" "5"
+9: Working Directory: /home/user/-/build-verify-sanitize
+9: Test timeout computed to be: 1500
+9: Experimental raw test program: halted RAX=42 RIP=16
+9: PS5 software and GTA VI are not supported.
+ 9/37 Test  #9: cli_raw_stack_demo ................   Passed    0.01 sec
+test 10
+      Start 10: cli_raw_bad_budget
+
+10: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-raw" "/home/user/-/examples/register-demo.bin" "0"
+10: Working Directory: /home/user/-/build-verify-sanitize
+10: Test timeout computed to be: 1500
+10: Budget must be an integer from 1 to 1000000.
+10/37 Test #10: cli_raw_bad_budget ................   Passed    0.01 sec
+test 11
+      Start 11: cli_raw_missing
+
+11: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-raw" "/home/user/-/build-verify-sanitize/nightfall-missing-test-file.bin"
+11: Working Directory: /home/user/-/build-verify-sanitize
+11: Test timeout computed to be: 1500
+11: Cannot use file: must be a nonempty regular test file of at most 65536 bytes.
+11/37 Test #11: cli_raw_missing ...................   Passed    0.01 sec
+test 12
+      Start 12: cli_raw_budget_exhausted
+
+12: Test command: /home/user/-/build-verify-sanitize/nightfall_cli "--run-raw" "/home/user/-/examples/register-demo.bin" "1"
+12: Working Directory: /home/user/-/build-verify-sanitize
+12: Test timeout computed to be: 1500
+12: Experimental raw test program: budget_exhausted RAX=0 RIP=10
+12: PS5 software and GTA VI are not supported.
+12/37 Test #12: cli_raw_budget_exhausted ..........   Passed    0.01 sec
+test 13
+      Start 13: nightfall_tests
+
+13: Test command: /home/user/-/build-verify-sanitize/nightfall_tests
+13: Working Directory: /home/user/-/build-verify-sanitize
+13: Test timeout computed to be: 1500
+13: All checks passed
+13/37 Test #13: nightfall_tests ...................   Passed    0.01 sec
+test 14
+      Start 14: memory_mapping_tests
+
+14: Test command: /home/user/-/build-verify-sanitize/memory_mapping_tests
+14: Working Directory: /home/user/-/build-verify-sanitize
+14: Test timeout computed to be: 1500
+14/37 Test #14: memory_mapping_tests ..............   Passed    0.01 sec
+test 15
+      Start 15: cpu_fault_tests
+
+15: Test command: /home/user/-/build-verify-sanitize/cpu_fault_tests
+15: Working Directory: /home/user/-/build-verify-sanitize
+15: Test timeout computed to be: 1500
+15/37 Test #15: cpu_fault_tests ...................   Passed    0.01 sec
+test 16
+      Start 16: cpu_branch_tests
+
+16: Test command: /home/user/-/build-verify-sanitize/cpu_branch_tests
+16: Working Directory: /home/user/-/build-verify-sanitize
+16: Test timeout computed to be: 1500
+16/37 Test #16: cpu_branch_tests ..................   Passed    0.01 sec
+test 17
+      Start 17: storage_tests
+
+17: Test command: /home/user/-/build-verify-sanitize/storage_tests
+17: Working Directory: /home/user/-/build-verify-sanitize
+17: Test timeout computed to be: 1500
+17: 40 storage and integration checks passed
+17/37 Test #17: storage_tests .....................   Passed    0.01 sec
+test 18
+      Start 18: input_tests
+
+18: Test command: /home/user/-/build-verify-sanitize/input_tests
+18: Working Directory: /home/user/-/build-verify-sanitize
+18: Test timeout computed to be: 1500
+18/37 Test #18: input_tests .......................   Passed    0.01 sec
+test 19
+      Start 19: memory_model_tests
+
+19: Test command: /home/user/-/build-verify-sanitize/memory_model_tests
+19: Working Directory: /home/user/-/build-verify-sanitize
+19: Test timeout computed to be: 1500
+19: operation 0: 1503 success, 6647 failure
+19: operation 1: 801 success, 7469 failure
+19: operation 2: 681 success, 7758 failure
+19: operation 3: 1172 success, 7193 failure
+19: operation 4: 1172 success, 7210 failure
+19: operation 5: 1127 success, 7267 failure
+19: 100 reproducible memory-model scenarios, 500 operations each passed
+19/37 Test #19: memory_model_tests ................   Passed    0.73 sec
+test 20
+      Start 20: graphics_tests
+
+20: Test command: /home/user/-/build-verify-sanitize/graphics_tests
+20: Working Directory: /home/user/-/build-verify-sanitize
+20: Test timeout computed to be: 1500
+20: 100 deterministic scenarios, 200 batches each: 7200 accepted, 12800 rejected; 13409 clears, 13297 fills, 13389 copies generated
+20/37 Test #20: graphics_tests ....................   Passed    0.10 sec
+test 21
+      Start 21: runtime_timer_tests
+
+21: Test command: /home/user/-/build-verify-sanitize/runtime_timer_tests
+21: Working Directory: /home/user/-/build-verify-sanitize
+21: Test timeout computed to be: 1500
+21: 100 scenarios, 1000 operations each; scheduled=26816 full=6379 cancelled=13742 advanced=33420
+21/37 Test #21: runtime_timer_tests ...............   Passed    0.12 sec
+test 22
+      Start 22: system_integration_tests
+
+22: Test command: /home/user/-/build-verify-sanitize/system_integration_tests
+22: Working Directory: /home/user/-/build-verify-sanitize
+22: Test timeout computed to be: 1500
+22/37 Test #22: system_integration_tests ..........   Passed    0.01 sec
+test 23
+      Start 23: cpu_register_tests
+
+23: Test command: /home/user/-/build-verify-sanitize/cpu_register_tests
+23: Working Directory: /home/user/-/build-verify-sanitize
+23: Test timeout computed to be: 1500
+23/37 Test #23: cpu_register_tests ................   Passed    0.01 sec
+test 24
+      Start 24: cpu_memory_mov_tests
+
+24: Test command: /home/user/-/build-verify-sanitize/cpu_memory_mov_tests
+24: Working Directory: /home/user/-/build-verify-sanitize
+24: Test timeout computed to be: 1500
+24: 1280 register/base/direction/addressing combinations passed
+24/37 Test #24: cpu_memory_mov_tests ..............   Passed    0.02 sec
+test 25
+      Start 25: cpu_address_stack_tests
+
+25: Test command: /home/user/-/build-verify-sanitize/cpu_address_stack_tests
+25: Working Directory: /home/user/-/build-verify-sanitize
+25: Test timeout computed to be: 1500
+25/37 Test #25: cpu_address_stack_tests ...........   Passed    0.01 sec
+test 26
+      Start 26: elf_loader_tests
+
+26: Test command: /home/user/-/build-verify-sanitize/elf_loader_tests
+26: Working Directory: /home/user/-/build-verify-sanitize
+26: Test timeout computed to be: 1500
+26/37 Test #26: elf_loader_tests ..................   Passed    0.01 sec
+test 27
+      Start 27: cpu_compiled_instructions_tests
+
+27: Test command: /home/user/-/build-verify-sanitize/cpu_compiled_instructions_tests
+27: Working Directory: /home/user/-/build-verify-sanitize
+27: Test timeout computed to be: 1500
+27/37 Test #27: cpu_compiled_instructions_tests ...   Passed    0.01 sec
+test 28
+      Start 28: cpu_jcc_tests
+
+28: Test command: /home/user/-/build-verify-sanitize/cpu_jcc_tests
+28: Working Directory: /home/user/-/build-verify-sanitize
+28: Test timeout computed to be: 1500
+28: 1024 conditional branch/flag cases passed
+28/37 Test #28: cpu_jcc_tests .....................   Passed    0.01 sec
+test 29
+      Start 29: cpu32_tests
+
+29: Test command: /home/user/-/build-verify-sanitize/cpu32_tests
+29: Working Directory: /home/user/-/build-verify-sanitize
+29: Test timeout computed to be: 1500
+29/37 Test #29: cpu32_tests .......................   Passed    0.01 sec
+test 30
+      Start 30: cpu32_memory_arithmetic_tests
+
+30: Test command: /home/user/-/build-verify-sanitize/cpu32_memory_arithmetic_tests
+30: Working Directory: /home/user/-/build-verify-sanitize
+30: Test timeout computed to be: 1500
+30: 29440 memory/register cross-checks passed
+30/37 Test #30: cpu32_memory_arithmetic_tests .....   Passed    0.23 sec
+test 31
+      Start 31: cpu32_memory_tests
+
+31: Test command: /home/user/-/build-verify-sanitize/cpu32_memory_tests
+31: Working Directory: /home/user/-/build-verify-sanitize
+31: Test timeout computed to be: 1500
+31: 320 32-bit memory register/base/mode combinations passed
+31/37 Test #31: cpu32_memory_tests ................   Passed    0.01 sec
+test 32
+      Start 32: cpu_add_differential
+
+32: Test command: /home/user/-/build-verify-sanitize/cpu_add_differential
+32: Working Directory: /home/user/-/build-verify-sanitize
+32: Test timeout computed to be: 1500
+32: 20108 native differential ADD cases passed
+32/37 Test #32: cpu_add_differential ..............   Passed    0.08 sec
+test 33
+      Start 33: cpu_sub_cmp_differential
+
+33: Test command: /home/user/-/build-verify-sanitize/cpu_sub_cmp_differential
+33: Working Directory: /home/user/-/build-verify-sanitize
+33: Test timeout computed to be: 1500
+33: 40216 native differential SUB and CMP cases passed
+33/37 Test #33: cpu_sub_cmp_differential ..........   Passed    0.14 sec
+test 34
+      Start 34: cpu_register_differential
+
+34: Test command: /home/user/-/build-verify-sanitize/cpu_register_differential
+34: Working Directory: /home/user/-/build-verify-sanitize
+34: Test timeout computed to be: 1500
+34: 32768 register instruction differential cases passed
+34/37 Test #34: cpu_register_differential .........   Passed    0.15 sec
+test 35
+      Start 35: cpu_imm8_differential
+
+35: Test command: /home/user/-/build-verify-sanitize/cpu_imm8_differential
+35: Working Directory: /home/user/-/build-verify-sanitize
+35: Test timeout computed to be: 1500
+35: 12288 native imm8 differential cases passed
+35/37 Test #35: cpu_imm8_differential .............   Passed    0.05 sec
+test 36
+      Start 36: cpu_test_differential
+
+36: Test command: /home/user/-/build-verify-sanitize/cpu_test_differential
+36: Working Directory: /home/user/-/build-verify-sanitize
+36: Test timeout computed to be: 1500
+36: 8192 native TEST differential cases passed
+36/37 Test #36: cpu_test_differential .............   Passed    0.04 sec
+test 37
+      Start 37: cpu32_differential
+
+37: Test command: /home/user/-/build-verify-sanitize/cpu32_differential
+37: Working Directory: /home/user/-/build-verify-sanitize
+37: Test timeout computed to be: 1500
+37: 15360 32-bit register/immediate differential cases passed
+37/37 Test #37: cpu32_differential ................   Passed    0.06 sec
+
+100% tests passed out of 37
+
+Total Test time (real) =   1.99 sec

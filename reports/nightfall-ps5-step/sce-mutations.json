@@ -1,0 +1,10 @@
+{
+  "binary_sha256": "0af05c9d56e69710f5e2aebd8a082587e481a0d1452efccfb68a5c6eeb0b36d4",
+  "seed_start": 392843,
+  "batches": 6598,
+  "comparisons_per_batch": 5000,
+  "total_comparisons": 32990000,
+  "elapsed_seconds": 360.009,
+  "finished_utc": "2026-11-19T18:33:50.261959+00:00",
+  "oracle_output": "5000 synthetic raw SCE-style mutation rollback/invariant cases passed"
+}

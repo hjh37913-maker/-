@@ -1,0 +1,10 @@
+{
+  "binary_sha256": "27954815cae4dce9b73e0409c2c52a883a284140f0cf320d51f927b629e20a01",
+  "seed_start": 532195,
+  "batches": 100846,
+  "comparisons_per_batch": 32768,
+  "total_comparisons": 3304521728,
+  "elapsed_seconds": 1000.003,
+  "finished_utc": "2026-11-19T17:32:20.573176+00:00",
+  "oracle_output": "32768 stateful fcntl/dup3/close native private-memfd comparisons passed"
+}
