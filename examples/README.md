@@ -98,3 +98,26 @@ interpreter's synthetic HLT with RAX=42. Build using the GCC flags above.
 64-bit host, `nightfall_cli --run-elf-sparse high.elf 5` stops with RAX=42.
 These programs contain synthetic HLT and **must not be run on the host**. No
 PS5 ABI or real game software is exercised.
+
+### Original dynamic relocation fixtures (Linux x86-64, GNU binutils)
+
+These are self-authored, unprotected research files, not game or PS5 binaries.
+Never run `static-pie-reloc.elf` directly on the host: it requires relocations
+but has no PT_INTERP or self-relocator. The distinct `pie-native-reloc.elf`
+uses the Linux dynamic linker. Regenerate on Linux:
+
+```sh
+as --64 examples/static-pie-reloc.s -o /tmp/static-pie-reloc.o
+ld -pie --no-dynamic-linker -z norelro -z noexecstack --build-id=none /tmp/static-pie-reloc.o -o examples/static-pie-reloc.elf
+ld -pie --dynamic-linker /lib64/ld-linux-x86-64.so.2 -z norelro -z noexecstack --build-id=none /tmp/static-pie-reloc.o -o examples/pie-native-reloc.elf
+as --64 examples/elf-local-symbol.s -o /tmp/elf-local-symbol.o
+ld -shared -z norelro -e _start --build-id=none /tmp/elf-local-symbol.o -o examples/elf-local-symbol.so
+as --64 examples/elf-import-consumer.s -o /tmp/elf-import-consumer.o
+ld -shared -z norelro -e _start --build-id=none /tmp/elf-import-consumer.o -o examples/elf-import-consumer.so
+as --64 examples/elf-import-provider.s -o /tmp/elf-import-provider.o
+ld -shared -z norelro --build-id=none /tmp/elf-import-provider.o -o examples/elf-import-provider.so
+```
+
+The `.so` files are used as original ELF test inputs by this project; Linux
+native oracle tests use `dlopen`, not direct host execution. Regeneration can
+vary with binutils version. None is a PS5 library, game or DRM component.

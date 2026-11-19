@@ -1,6 +1,7 @@
 #include "core/machine.h"
 #include "storage/storage.h"
 #include "loader/elf64.h"
+#include "loader/static_pie.h"
 #include "loader/elf_inspect.h"
 #include "runtime/linux_process.h"
 #include <array>
@@ -100,7 +101,7 @@ const char* process_name(nightfall::runtime::ProcessResult result) {
     return "unknown";
 }
 
-int linux_elf(const char* path,std::size_t budget,std::span<const std::string> args,bool read_stdin,bool fixture) {
+int linux_elf(const char* path,std::size_t budget,std::span<const std::string> args,bool read_stdin,bool fixture,bool static_pie) {
     constexpr std::uint64_t virtual_size=1ULL<<44;
     constexpr std::size_t stack_size=65536, image_limit=1024*1024, max_pages=4096;
     if(sizeof(std::size_t)<8) { std::cerr << "Linux test mode requires a 64-bit host.\n"; return 1; }
@@ -109,7 +110,8 @@ int linux_elf(const char* path,std::size_t budget,std::span<const std::string> a
     auto data=nightfall::storage::read_range(path,0,static_cast<std::size_t>(size),image_limit);
     if(data.status!=nightfall::storage::ReadStatus::ok) { std::cerr << "Test ELF read failed.\n"; return 1; }
     nightfall::Machine machine(static_cast<std::size_t>(virtual_size),nightfall::SparsePages{max_pages});
-    auto status=nightfall::loader::load_elf64(data.bytes,machine,virtual_size-stack_size,stack_size);
+    auto status=static_pie?nightfall::loader::load_static_pie(data.bytes,machine,0x40000000ULL,virtual_size-stack_size,stack_size)
+                          :nightfall::loader::load_elf64(data.bytes,machine,virtual_size-stack_size,stack_size);
     if(status!=nightfall::loader::ElfStatus::ok) { std::cerr << "Test ELF rejected: " << nightfall::loader::elf_status_name(status) << '\n'; return 1; }
     if(!nightfall::runtime::prepare_linux_stack(machine,virtual_size-stack_size,stack_size,args)) { std::cerr << "Cannot prepare bounded test process stack.\n"; return 1; }
     nightfall::runtime::LinuxProcess process(machine);
@@ -173,7 +175,7 @@ int inspect(const char* path) {
 }
 int main(int argc,char** argv) {
     if (argc>1) {
-        if (std::string_view(argv[1])=="--run-linux-elf" || std::string_view(argv[1])=="--run-linux-elf-stdin" || std::string_view(argv[1])=="--run-linux-elf-fixture") {
+        if (std::string_view(argv[1])=="--run-linux-elf" || std::string_view(argv[1])=="--run-linux-elf-stdin" || std::string_view(argv[1])=="--run-linux-elf-fixture" || std::string_view(argv[1])=="--run-linux-static-pie") {
             if(argc<3 || argc>131) { std::cerr << "Usage: nightfall_cli --run-linux-elf file [budget [arguments...]]\n"; return 2; }
             std::size_t budget=default_budget;
             if(argc>=4) {
@@ -184,7 +186,7 @@ int main(int argc,char** argv) {
             }
             std::vector<std::string> args{"nightfall-guest"};
             for(int i=4;i<argc;++i) args.emplace_back(argv[i]);
-            return linux_elf(argv[2],budget,args,std::string_view(argv[1])=="--run-linux-elf-stdin",std::string_view(argv[1])=="--run-linux-elf-fixture");
+            return linux_elf(argv[2],budget,args,std::string_view(argv[1])=="--run-linux-elf-stdin",std::string_view(argv[1])=="--run-linux-elf-fixture",std::string_view(argv[1])=="--run-linux-static-pie");
         }
         if (std::string_view(argv[1])=="--inspect-elf") {
             if(argc!=3) { std::cerr << "Usage: nightfall_cli --inspect-elf file\n"; return 2; }

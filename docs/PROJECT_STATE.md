@@ -17,8 +17,18 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 140 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 146 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current unprotected ELF relocations and guest imports
+
+A separate opt-in ET_DYN loader handles bounded RELATIVE and self-symbol
+GLOB_DAT/64 relocations plus explicitly supplied guest-address-only bindings.
+Six new tests run authored fixtures, include fail-closed rejection and rollback,
+and compare three original cases with Linux native dynamic linking. Linux
+Debug, Release and ASan+UBSan passed 146/146 tests each. Windows x64 was
+cross-compiled only. This is not a PS5 loader or evidence of GTA VI support.
+See `docs/ELF_LOADER.md` for restrictions.
 
 ## Current descriptor-flag batch
 

@@ -22,3 +22,39 @@ the file can change between reads.
 The separate `--run-elf-sparse` mode loads only original trusted unprotected
 test ELFs, with bounded sparse guest memory. It does not implement the PS5
 loader or support games. See MEMORY_ARCHITECTURE.md for limits.
+
+## Opt-in ET_DYN research loader
+
+`load_static_pie` is a separate, strictly bounded loader for original,
+unprotected x86-64 ELF `ET_DYN` fixtures. It maps non-overlapping PT_LOAD
+segments at an explicit aligned load bias, applies selected RELA relocations,
+then sets segment permissions and creates a non-overlapping stack. It stages
+memory and CPU state, committing only after success. It implements
+`R_X86_64_RELATIVE` with symbol zero and `R_X86_64_64` / `R_X86_64_GLOB_DAT`
+for ordinary defined symbols or explicitly supplied import bindings. Defined
+symbols resolve within the same image without symbol interposition. Bindings
+map exact names to guest virtual addresses only; the loader never looks up
+host symbols or converts host pointers. Unbound imports return
+`unresolved_symbol`. Every import name, binding list, table and relocation
+count is bounded. Bindings do not install executable code, PS5 services or
+trampolines; the caller is responsible for their correctness. Guest addresses
+may be unmapped and execution will then fault.
+
+`PT_INTERP`, `PT_TLS`, RELRO, executable stacks, unknown program headers,
+external library dependencies (`DT_NEEDED`), PLT/JUMP_SLOT, constructors,
+versioned symbols, IFUNC, TLS symbols, REL/RELR and unknown dynamic tags are
+rejected rather than silently emulated. Hash/debug metadata is ignored.
+This is not a dynamic linker or a PS5 ELF/SELF loader, nor a secure sandbox.
+It does not parse or decrypt protected files and does not prove compatibility
+with any game. As with the original loader, allocation exceptions can propagate.
+A caller must provide trusted original input and a suitable guest ABI.
+
+`nightfall_cli --run-linux-static-pie examples/static-pie-reloc.elf 100`
+executes the authored no-interpreter fixture under the experimental Linux test
+ABI and exits 42. **Do not execute that no-interpreter fixture on the host**:
+the host will not apply its relocation. The separately built authored
+`pie-native-reloc.elf` includes the normal Linux dynamic interpreter and is
+used only as a native comparison. Other authored `.so` fixtures compare
+self-defined and explicitly bound guest symbols with Linux `dlopen` in an
+isolated test child, not with PS5 software. Sources and reproducible build
+commands are in `examples/README.md`.

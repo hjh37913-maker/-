@@ -55,3 +55,15 @@ Three original freestanding C fixtures exercise these operations; an integration
 check validates byte copies in guest memory. Windows x64 tests cross-compiled,
 but could not be run on Windows. No PS5 operating system, graphics stack or
 game support is implied.
+
+### Upstream project review (2026-11-19)
+The public [KytyPS5 repository](https://github.com/KytyPS5/KytyPS5) describes
+itself as a PS5 translation layer targeting Windows/Linux with an experimental
+macOS port; its source is GPL-2.0. Its documentation describes substantial
+loader, service, GPU and shader work beyond NIGHTFALL. This is a project claim,
+not independent proof of GTA VI compatibility. A search on 2026-11-19 found
+[an issue](https://github.com/KytyPS5/KytyPS5/issues/2404) asking to test GTA VI
+without an actual game test, build, logs or reproducible result; it does not
+establish either compatibility or incompatibility. No game or protected file
+was obtained or executed, and no upstream source code was copied. NIGHTFALL's
+new generic unprotected ELF relocation/import work is not a PS5 loader.

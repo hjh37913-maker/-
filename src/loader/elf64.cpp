@@ -21,6 +21,7 @@ const char* elf_status_name(ElfStatus status) noexcept {
     case ElfStatus::overlap: return "overlap";
     case ElfStatus::resource_limit: return "resource_limit";
     case ElfStatus::no_executable_entry: return "no_executable_entry";
+    case ElfStatus::unresolved_symbol: return "unresolved_symbol";
     }
     return "unknown";
 }
