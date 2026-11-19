@@ -17,8 +17,17 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 152 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 155 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current synthetic guest service experiment
+
+Explicit guest-address bindings dispatch bounded SysV memory/string primitives
+and an authored SCE-style synthetic file exercises a guest call at three load
+biases. Linux Debug, Release and ASan+UBSan passed 155/155 tests before
+additional fault assertions; those updated tests were rerun in all three.
+Windows test cross-compiled only. This is not a verified PS5 system library,
+PS5 file loader or GPU. Details: `../reports/nightfall-guest-services/WORK_REPORT.md`.
 
 ## Current synthetic raw-loader mutation coverage
 
