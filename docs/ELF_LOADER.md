@@ -63,3 +63,21 @@ commands are in `examples/README.md`.
 The deterministic mutation test changes bytes in an authored ELF, checks that
 failed loads leave state intact, and checks success invariants. It is not a
 coverage-guided fuzzer, independent semantic oracle, or security guarantee.
+
+## Opt-in raw SCE-style fixture runner
+
+`nightfall_cli --run-sce-raw FILE [BUDGET]` connects the existing restricted
+raw SCE-style relocation loader to the x86-64 interpreter. This is strictly
+for trusted, independently authored, unprotected fixtures. File input is bounded
+to 8 MiB, guest virtual space to 256 MiB, sparse allocation to 4096 pages, and
+execution to at most one million instruction steps. A 64 KiB stack and fixed
+0x100000 load bias are used. A normal CPU stop or loader error is reported;
+missing symbol/dependency names are escaped before terminal output.
+
+The command supplies **no** import bindings, libraries, syscall ABI, guest
+services, firmware, SELF support, decryption, PS5 graphics or game support.
+Dependencies and unresolved imports are rejected; syscalls trap. Successful
+loading or HLT does not demonstrate platform or game compatibility. File paths
+are not isolated, file reads may race, and this interpreter is not a sandbox;
+do not run untrusted files. This command has been compiled on Linux and
+cross-compiled for Windows x64, but has not been executed or tested.

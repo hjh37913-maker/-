@@ -20,6 +20,14 @@
 | Coverage | Measured, limited | 156 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
+## Raw SCE-style fixture CLI (unverified)
+
+`--run-sce-raw` exposes the restricted experimental raw loader and bounded CPU
+runner for trusted authored files. It has no bindings, libraries, syscall ABI,
+PS5 graphics, SELF or protected-file support. It was compiled on Linux and
+cross-compiled for Windows x64; the new command was not run or tested. It does
+not launch GTA VI or establish PS5 compatibility. See `ELF_LOADER.md`.
+
 ## Standalone synthetic diagnostic
 
 `nightfall_sce_service_demo` runs an embedded authored test through the raw

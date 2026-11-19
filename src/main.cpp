@@ -4,6 +4,7 @@
 #include "loader/static_pie.h"
 #include "loader/elf_inspect.h"
 #include "loader/sce_import_inspect.h"
+#include "loader/sce_raw_reloc.h"
 #include "runtime/linux_process.h"
 #include <array>
 #include <charconv>
@@ -168,6 +169,43 @@ int linux_elf(const char* path,std::size_t budget,std::span<const std::string> a
     return 1;
 }
 
+// Explicit opt-in for trusted, independently authored, unprotected SCE-style
+// fixtures. No imports, dependencies, syscall ABI, host symbols or services
+// are supplied by this mode. It must not be used as a sandbox.
+int sce_raw(const char* path, std::size_t budget) {
+    constexpr std::size_t max_file=8*1024*1024;
+    constexpr std::size_t guest_capacity=256*1024*1024, stack_size=64*1024;
+    constexpr std::uint64_t bias=0x100000, stack_base=guest_capacity-stack_size;
+    std::cout << "Experimental SCE-style raw ELF mode for trusted authored fixtures only.\n"
+                 "No SELF/decryption, PS5 ABI, graphics or games are supported. Not a sandbox.\n";
+    std::error_code ec;
+    const auto size=std::filesystem::file_size(path,ec);
+    if(ec || size==0 || size>max_file) {
+        std::cerr << "File must be a nonempty regular unprotected ELF no larger than " << max_file << " bytes.\n";
+        return 1;
+    }
+    auto input=nightfall::storage::read_range(path,0,static_cast<std::size_t>(size),max_file);
+    if(input.status!=nightfall::storage::ReadStatus::ok) {
+        std::cerr << "Could not read the entire regular file.\n"; return 1;
+    }
+    nightfall::Machine machine(guest_capacity,nightfall::SparsePages{4096});
+    std::string missing;
+    const auto status=nightfall::loader::load_sce_raw_relocatable(input.bytes,machine,bias,stack_base,stack_size,{},&missing);
+    if(status!=nightfall::loader::ElfStatus::ok) {
+        std::cerr << "Raw ELF rejected: " << nightfall::loader::elf_status_name(status);
+        if(!missing.empty()) std::cerr << " (unresolved: " << escaped_symbol(missing) << ")";
+        std::cerr << "\nNo libraries or imports are supplied in this mode.\n";
+        return 1;
+    }
+    const auto report=machine.run_detailed(budget);
+    std::cout << "Experimental guest stopped: " << name(report.result)
+              << " RAX=" << machine.cpu.state.rax << " RIP=" << machine.cpu.state.rip << '\n';
+    diagnostic(report);
+    if(report.result==nightfall::RunResult::syscall_trap)
+        std::cerr << "System calls are not implemented in this mode.\n";
+    return report.result==nightfall::RunResult::halted?0:1;
+}
+
 int inspect_sce(const char* path) {
     const auto report=nightfall::loader::inspect_sce_imports(path);
     if(report.status!=nightfall::loader::SceInspectStatus::ok) {
@@ -233,6 +271,18 @@ int main(int argc,char** argv) {
             std::vector<std::string> args{"nightfall-guest"};
             for(int i=4;i<argc;++i) args.emplace_back(argv[i]);
             return linux_elf(argv[2],budget,args,std::string_view(argv[1])=="--run-linux-elf-stdin",std::string_view(argv[1])=="--run-linux-elf-fixture",std::string_view(argv[1])=="--run-linux-static-pie");
+        }
+        if (std::string_view(argv[1])=="--run-sce-raw") {
+            if(argc<3 || argc>4) { std::cerr << "Usage: nightfall_cli --run-sce-raw trusted-original-fixture [instruction-budget]\n"; return 2; }
+            std::size_t budget=default_budget;
+            if(argc==4) {
+                std::string_view value(argv[3]);
+                auto result=std::from_chars(value.data(),value.data()+value.size(),budget);
+                if(value.empty() || result.ec!=std::errc{} || result.ptr!=value.data()+value.size() || !budget || budget>max_budget) {
+                    std::cerr << "Budget must be an integer from 1 to " << max_budget << ".\n"; return 2;
+                }
+            }
+            return sce_raw(argv[2],budget);
         }
         if (std::string_view(argv[1])=="--inspect-sce-imports") {
             if(argc!=3) { std::cerr << "Usage: nightfall_cli --inspect-sce-imports unprotected-elf\n"; return 2; }
