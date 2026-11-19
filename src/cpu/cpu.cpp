@@ -183,6 +183,31 @@ StepResult Cpu::step(Memory& memory) {
         state.rip+=length;
         return StepResult::running;
     }
+    // PUSH imm8/imm32 in long mode sign-extends to the 64-bit stack slot.
+    if (!extended_stack && (stack_opcode==0x6a || stack_opcode==0x68)) {
+        const unsigned width=stack_opcode==0x6a?1:4;
+        if (!memory.fetch(state.rip,std::span(b).first(1+width))) return StepResult::memory_fault;
+        auto& rsp=*state.reg(4); const auto next_rsp=rsp-8;
+        const auto value=sign_extend(little(b.data()+1,width),width*8);
+        if (!memory.write(next_rsp,bytes64(value))) return StepResult::memory_fault;
+        rsp=next_rsp; state.rip+=1+width;
+        return StepResult::running;
+    }
+    // LEAVE: RSP=RBP; POP RBP. Faults leave both registers unchanged.
+    if (!extended_stack && stack_opcode==0xc9) {
+        const auto frame=*state.reg(5); std::array<std::uint8_t,8> value{};
+        if (!memory.read(frame,value)) return StepResult::memory_fault;
+        *state.reg(4)=frame+8; *state.reg(5)=little(value.data(),8); ++state.rip;
+        return StepResult::running;
+    }
+    // RET imm16 also discards an unsigned number of argument bytes.
+    if (!extended_stack && stack_opcode==0xc2) {
+        if (!memory.fetch(state.rip,std::span(b).first(3))) return StepResult::memory_fault;
+        auto& rsp=*state.reg(4); std::array<std::uint8_t,8> address{};
+        if (!memory.read(rsp,address)) return StepResult::memory_fault;
+        state.rip=little(address.data(),8); rsp+=8+little(b.data()+1,2);
+        return StepResult::running;
+    }
     if (!extended_stack && stack_opcode==0xe8) { // CALL rel32
         if (!memory.fetch(state.rip,std::span(b).first(5))) return StepResult::memory_fault;
         const auto return_address=state.rip+5;

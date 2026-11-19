@@ -8,3 +8,11 @@ An x86-64 host may eventually allow native execution of some guest instructions,
 
 ## Unknown / limitations
 Exact exposed instruction feature set, guest virtual memory layout and kernel ABI, command formats, shader ISA variants, graphics synchronization and resource semantics, decompression interfaces, and game-specific requirements are not established here. Public general AMD documentation cannot establish console-specific behavior. No console, SDK, guest software, measured hardware behavior or proprietary documentation was accessed. Further lawful documentation and original test programs are required; no bypass of access controls is planned.
+
+### CPU stack-frame experiment (2026-11-19)
+The x86-64 interpreter now implements unprefixed `PUSH imm8`, `PUSH imm32`
+(sign-extended to 64 bits), `LEAVE`, and `RET imm16`. Tests cover boundary
+immediates, register/flag behavior, truncated instructions and stack faults.
+These are generic instruction semantics for original test programs, not a PS5
+ABI, game loader, graphics implementation, or evidence of game compatibility.
+No native CPU differential test for these new instructions was performed.
