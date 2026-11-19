@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "started_utc": "2026-11-19T13:16:09.268818+00:00",
+  "finished_utc": "2026-11-19T13:42:42.129862+00:00",
+  "elapsed_seconds": 1592.861,
+  "batches": 4843,
+  "comparisons": 11426070528,
+  "iterations_per_form": 65536,
+  "first_seed_formula": "0x849cdef039217aad + batch * 0x9e3779b97f4a7c15 mod 2^64",
+  "oracle": "native register shifts with equivalent counts, not identical immediate encoding or guest addressing",
+  "error": "",
+  "binary_sha256": "2059ab5060f8516e958194138f20329aa117909abea51764245b20d32ba7fee1",
+  "binary_scope": "Release test executable built before later sparse-memory changes; not the final whole-project build"
+}
