@@ -34,3 +34,5 @@
 2026-11-19 continuation: Refactored effective-address calculation into a shared CPU decoder to implement unprefixed 32-bit memory MOV and LEA without duplicating SIB/RIP-relative handling. Immediate bytes are included when calculating RIP-relative addresses. Arithmetic memory and 32-bit REX forms remain unsupported. This work enables only original synthetic/freestanding test programs, not PS5 binaries.
 
 2026-11-19 continuation: Added selected unprefixed 32-bit memory arithmetic forms with staged CPU state for write faults. This models single-threaded instruction outcomes only: read-modify-write is not host-atomic and LOCK is not supported. Cross-checks against register forms are not independent native differential tests.
+
+2026-11-19 continuation: Implemented 32-bit register/memory XOR and 64-bit register XOR, preserving undefined AF consistently with TEST. No LOCK or 64-bit XOR memory form. Added an independent native oracle for selected 32-bit memory register-operand arithmetic (not memory immediate forms), and both 32- and 64-bit register XOR. No change to synthetic HLT or console support.

@@ -42,3 +42,6 @@ The C compiler and linker versions or flags may generate different instructions 
 
 ## Memory arithmetic fixture
 `memory-arithmetic-demo.c` uses explicit inline x86 assembly for 32-bit memory ADD/SUB/CMP, compiled with GCC 12.2 using the same freestanding flags as the array fixture. Run `./build/nightfall_cli --run-elf examples/memory-arithmetic-demo.elf 100` and expect RAX=42 at synthetic HLT. Do not execute the ELF directly on the host. It does not exercise any OS or console interface.
+
+## XOR C fixture
+`xor-demo.c` uses ordinary C XOR and is compiled with GCC 12.2 and the freestanding flags shown above. Run `./build/nightfall_cli --run-elf examples/xor-demo.elf 100`; expected RAX=42. It uses the synthetic HLT sentinel: **do not execute the ELF directly on the host**. This is not a console or operating-system program.
