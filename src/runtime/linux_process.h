@@ -42,6 +42,8 @@ private:
     struct Descriptor { FdKind kind=FdKind::unused; std::size_t file_index=0; std::uint64_t cursor=0; };
     struct ReadSource { const std::vector<std::uint8_t>* bytes=nullptr; std::uint64_t* cursor=nullptr; };
     ReadSource read_source(std::uint32_t fd) noexcept;
+    unsigned lookup_test_file(std::uint64_t guest_path,std::size_t& index);
+    bool write_test_stat(std::size_t index,std::uint64_t guest_address);
     void dispatch();
     Machine& machine_;
     std::size_t max_output_;

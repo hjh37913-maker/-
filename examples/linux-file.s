@@ -15,6 +15,14 @@ _start:
     test %rax, %rax
     js fail
     mov %rax, %r12
+    mov $5, %eax
+    mov %r12, %rdi
+    lea statbuf(%rip), %rsi
+    syscall
+    test %rax, %rax
+    jne fail
+    cmpq $26, statbuf+48(%rip)
+    jne fail
     mov $17, %eax
     mov %r12, %rdi
     lea buffer(%rip), %rsi
@@ -56,3 +64,4 @@ fail:
     syscall
 .section .bss
 .lcomm buffer, 18
+.lcomm statbuf, 144

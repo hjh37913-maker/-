@@ -17,8 +17,15 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 130 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 131 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current synthetic file-metadata batch
+
+Added bounded x86-64 synthetic stat/fstat metadata for registered test files
+and an original compiled C file fixture. Linux Debug, Release and ASan+UBSan
+passed 131/131 tests each; Windows x64 cross-compiled only. Metadata and paths
+are synthetic, not host access, PS5 support or game compatibility.
 
 ## Current synthetic read-only files batch
 

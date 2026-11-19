@@ -17,7 +17,8 @@ stdin mode, reads host standard input.
   `AT_NULL` only; it is not a complete Linux auxiliary vector. Arguments are
   bounded, and the initial stack pointer is aligned to 16 bytes.
 * Syscalls: buffered `read`/`readv` and `write`/`writev`; `open`, `openat`,
-  `close`, `lseek` and `pread64` for opt-in immutable in-memory fixtures;
+  `close`, `lseek`, `pread64` and selected stat calls for opt-in immutable
+  in-memory fixtures;
   a bounded page-mapped synthetic `brk`, a constrained anonymous
   `mmap`/`mprotect`/`munmap` arena, and `exit`/`exit_group`.
   Other syscalls return `-ENOSYS`. Counts, memory, I/O, argument strings and
@@ -39,7 +40,11 @@ stdin mode, reads host standard input.
   are 19 modeled descriptor slots (including standard streams). Closing a
   descriptor permits its reuse. The model's errors, resource limits and
   `readv` atomic fault behavior differ from Linux; there is no file write,
-  directory API, stat, host filesystem or process exec.
+  directory API, host filesystem or process exec. `stat`, `lstat`, `fstat`
+  and `newfstatat` use a 144-byte x86-64 Linux layout for registered files,
+  with deterministic synthetic inode, mode 0444, sizes and zero timestamps;
+  metadata is not host metadata. `newfstatat` only accepts AT_FDCWD and zero
+  flags. `fstat` for the standard streams is not implemented.
 * Guest divide-by-zero and quotient overflow stop with a modeled `divide_error`;
   no SIGFPE or guest signal delivery is implemented. Unaligned MOVDQA/MOVAPS
   memory operands stop with a modeled `alignment_fault`, not a delivered #GP.
@@ -77,7 +82,9 @@ heap, mmap ownership, vector I/O, execution budgets, and 50,000 stateful steps a
 separate bounded software model (not an independent native oracle). On Linux
 x86-64, private-pipe comparisons exercise 8,192 generated cases per basic
 read, write, readv and writev oracle. A separate native private-memfd test
-compares 25,600 stateful file read/pread/lseek/readv operations. Original
+compares 25,600 stateful file read/pread/lseek/readv operations and 256 file
+size/type checks for fstat; inode, permissions and timestamps are synthetic.
+Original
 Linux ELF examples are compared
 with native output and exit where applicable. These are finite test cases, not
 proof of full syscall compatibility. A further 50,000 mmap arena operations

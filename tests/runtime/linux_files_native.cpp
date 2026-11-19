@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iostream>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/uio.h>
 #include <unistd.h>
 using namespace nightfall;
@@ -26,6 +27,12 @@ int main() {
   Machine m(2048);const std::array<std::uint8_t,2> code{0x0f,0x05};const std::array<std::uint8_t,6> path{'/','t','e','s','t',0};
   if(!m.memory.write(0,code)||!m.memory.write(64,path))return 1;LinuxProcess p(m);
   if(!p.add_test_file("/test",std::span(file).first(size))||call(p,m,2,64)!=3)return 1;
+  // Compare selected portable facts, not synthetic inode/time/mode metadata.
+  struct stat host_stat{}; if(::fstat(host,&host_stat) || !S_ISREG(host_stat.st_mode))return 1;
+  if(call(p,m,5,3,1024)!=0)return 1;std::array<std::uint8_t,144> guest_stat{};if(!m.memory.read(1024,guest_stat))return 1;
+  std::uint64_t guest_size=0;for(unsigned j=0;j<8;++j)guest_size|=std::uint64_t(guest_stat[48+j])<<(8*j);
+  const unsigned guest_mode=unsigned(guest_stat[24])|(unsigned(guest_stat[25])<<8);
+  if(guest_size!=static_cast<std::uint64_t>(host_stat.st_size) || (guest_mode&0170000)!=0100000)return 1;
   for(unsigned step=0;step<100;++step) {
    const auto op=next(rng)%4; const auto count=next(rng)%17;const bool bad=next(rng)%9==0;
    std::array<std::uint8_t,32> native_data{},guest_data{};native_data.fill(0xa5);guest_data.fill(0xa5);
@@ -45,5 +52,5 @@ int main() {
   }
   if(::close(host))return 1;
  }
- std::cout<<cases<<" native private-memfd read/pread/lseek/readv stateful comparisons passed\n";
+ std::cout<<cases<<" native private-memfd read/pread/lseek/readv stateful comparisons plus 256 selected fstat metadata checks passed\n";
 }

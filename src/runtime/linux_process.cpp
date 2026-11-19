@@ -6,7 +6,7 @@
 namespace nightfall::runtime {
 namespace {
 constexpr std::size_t stack_limit=65536, arg_limit=128, arg_bytes_limit=32768;
-void put64(std::vector<std::uint8_t>& data,std::size_t pos,std::uint64_t v) {
+template<class Buffer> void put64(Buffer& data,std::size_t pos,std::uint64_t v) {
     for(unsigned i=0;i<8;++i) data[pos+i]=static_cast<std::uint8_t>(v>>(8*i));
 }
 std::uint64_t err(unsigned code) { return std::uint64_t{0}-code; }
@@ -67,6 +67,31 @@ bool LinuxProcess::set_stdin(std::span<const std::uint8_t> bytes) {
     try { std::vector<std::uint8_t> staged; if(!bytes.empty()) staged.assign(bytes.begin(),bytes.end()); stdin_=std::move(staged); stdin_cursor_=0; return true; }
     catch(const std::bad_alloc&) { return false; } catch(const std::length_error&) { return false; }
 }
+unsigned LinuxProcess::lookup_test_file(std::uint64_t address,std::size_t& index) {
+    try {
+        std::string path; bool terminated=false;
+        for(std::size_t i=0;i<256;++i) {
+            if(address>std::numeric_limits<std::uint64_t>::max()-i) return 14;
+            std::array<std::uint8_t,1> ch{};
+            if(!machine_.memory.read(address+i,ch)) return 14;
+            if(!ch[0]) { terminated=true; break; }
+            path.push_back(static_cast<char>(ch[0]));
+        }
+        if(!terminated) return 36;
+        index=0; while(index<files_.size() && files_[index].path!=path) ++index;
+        return index==files_.size()?2:0;
+    } catch(const std::bad_alloc&) { return 12; } catch(const std::length_error&) { return 12; }
+}
+bool LinuxProcess::write_test_stat(std::size_t index,std::uint64_t address) {
+    // Linux x86-64 struct stat, 144 bytes. Metadata is synthetic, not a host
+    // file identity, credential, timestamp or implementation-defined struct.
+    std::array<std::uint8_t,144> stat{};
+    const auto size=files_[index].bytes.size();
+    put64(stat,8,index+1); put64(stat,16,1); // synthetic inode, link count
+    stat[24]=0x24; stat[25]=0x81; // S_IFREG | 0444, little endian
+    put64(stat,48,size); put64(stat,56,4096); put64(stat,64,(size+511)/512);
+    return machine_.memory.write(address,stat);
+}
 bool LinuxProcess::configure_brk(std::uint64_t base,std::uint64_t limit) {
     constexpr std::uint64_t page=4096, max_heap=1024*1024;
     if(started_ || exited_ || brk_configured_ || base>=limit || (base&(page-1)) || (limit&(page-1)) ||
@@ -90,27 +115,35 @@ void LinuxProcess::dispatch() {
         if(number==257 && static_cast<std::uint32_t>(arg0)!=0xffffff9cU) { state.rax=err(9); return; } // AT_FDCWD
         if(flags&3) { state.rax=err(30); return; } // read-only fixture table
         if(flags&~0x80000U) { state.rax=err(22); return; } // optional O_CLOEXEC
-        try {
-            std::string path; bool terminated=false;
-            for(std::size_t i=0;i<256;++i) {
-                if(path_address>std::numeric_limits<std::uint64_t>::max()-i) { state.rax=err(14); return; }
-                std::array<std::uint8_t,1> ch{};
-                if(!machine_.memory.read(path_address+i,ch)) { state.rax=err(14); return; }
-                if(!ch[0]) { terminated=true; break; }
-                path.push_back(static_cast<char>(ch[0]));
-            }
-            if(!terminated) { state.rax=err(36); return; }
-            std::size_t file=0; while(file<files_.size() && files_[file].path!=path) ++file;
-            if(file==files_.size()) { state.rax=err(2); return; }
-            std::size_t fd=0; while(fd<descriptors_.size() && descriptors_[fd].kind!=FdKind::unused) ++fd;
-            if(fd==descriptors_.size()) { state.rax=err(24); return; }
-            descriptors_[fd]={FdKind::file,file,0}; state.rax=fd; return;
-        } catch(const std::bad_alloc&) { state.rax=err(12); return; } catch(const std::length_error&) { state.rax=err(12); return; }
+        std::size_t file=0; const auto error=lookup_test_file(path_address,file);
+        if(error) { state.rax=err(error); return; }
+        std::size_t fd=0; while(fd<descriptors_.size() && descriptors_[fd].kind!=FdKind::unused) ++fd;
+        if(fd==descriptors_.size()) { state.rax=err(24); return; }
+        descriptors_[fd]={FdKind::file,file,0}; state.rax=fd; return;
     }
     if(number==3) { // close any modeled descriptor; no host descriptor exists.
         const auto fd=static_cast<std::uint32_t>(arg0);
         if(fd>=descriptors_.size() || descriptors_[fd].kind==FdKind::unused) { state.rax=err(9); return; }
         descriptors_[fd]={}; state.rax=0; return;
+    }
+    if(number==4 || number==5 || number==6 || number==262) { // synthetic x86-64 stat
+        std::size_t index=0; std::uint64_t destination=arg1;
+        if(number==5) {
+            const auto fd=static_cast<std::uint32_t>(arg0);
+            if(fd>=descriptors_.size() || descriptors_[fd].kind==FdKind::unused) { state.rax=err(9); return; }
+            if(descriptors_[fd].kind!=FdKind::file) { state.rax=err(38); return; }
+            index=descriptors_[fd].file_index;
+        } else {
+            auto path=arg0;
+            if(number==262) {
+                if(static_cast<std::uint32_t>(arg0)!=0xffffff9cU) { state.rax=err(9); return; }
+                if(*state.reg(10)!=0) { state.rax=err(22); return; }
+                path=arg1; destination=arg2;
+            }
+            const auto error=lookup_test_file(path,index); if(error) { state.rax=err(error); return; }
+        }
+        if(!write_test_stat(index,destination)) { state.rax=err(14); return; }
+        state.rax=0; return;
     }
     if(number==8) { // lseek: synthetic regular files only, signed offset
         const auto fd=static_cast<std::uint32_t>(arg0), whence=static_cast<std::uint32_t>(arg2);
