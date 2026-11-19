@@ -100,7 +100,7 @@ const char* process_name(nightfall::runtime::ProcessResult result) {
     return "unknown";
 }
 
-int linux_elf(const char* path,std::size_t budget,std::span<const std::string> args,bool read_stdin) {
+int linux_elf(const char* path,std::size_t budget,std::span<const std::string> args,bool read_stdin,bool fixture) {
     constexpr std::uint64_t virtual_size=1ULL<<44;
     constexpr std::size_t stack_size=65536, image_limit=1024*1024, max_pages=4096;
     if(sizeof(std::size_t)<8) { std::cerr << "Linux test mode requires a 64-bit host.\n"; return 1; }
@@ -113,6 +113,12 @@ int linux_elf(const char* path,std::size_t budget,std::span<const std::string> a
     if(status!=nightfall::loader::ElfStatus::ok) { std::cerr << "Test ELF rejected: " << nightfall::loader::elf_status_name(status) << '\n'; return 1; }
     if(!nightfall::runtime::prepare_linux_stack(machine,virtual_size-stack_size,stack_size,args)) { std::cerr << "Cannot prepare bounded test process stack.\n"; return 1; }
     nightfall::runtime::LinuxProcess process(machine);
+    if(fixture) {
+        constexpr std::string_view content="Nightfall synthetic data.\n";
+        if(!process.add_test_file("/test/input",std::span(reinterpret_cast<const std::uint8_t*>(content.data()),content.size()))) {
+            std::cerr << "Cannot set up synthetic test fixture.\n"; return 1;
+        }
+    }
     // Fixed test-only heap; overlap with loaded mappings fails safely on brk growth.
     if(!process.configure_brk(0x80000000ULL,0x80100000ULL) || !process.configure_mmap(0x90000000ULL,0x90400000ULL)) { std::cerr << "Test heap/arena setup failed.\n"; return 1; }
 #ifdef _WIN32
@@ -167,7 +173,7 @@ int inspect(const char* path) {
 }
 int main(int argc,char** argv) {
     if (argc>1) {
-        if (std::string_view(argv[1])=="--run-linux-elf" || std::string_view(argv[1])=="--run-linux-elf-stdin") {
+        if (std::string_view(argv[1])=="--run-linux-elf" || std::string_view(argv[1])=="--run-linux-elf-stdin" || std::string_view(argv[1])=="--run-linux-elf-fixture") {
             if(argc<3 || argc>131) { std::cerr << "Usage: nightfall_cli --run-linux-elf file [budget [arguments...]]\n"; return 2; }
             std::size_t budget=default_budget;
             if(argc>=4) {
@@ -178,7 +184,7 @@ int main(int argc,char** argv) {
             }
             std::vector<std::string> args{"nightfall-guest"};
             for(int i=4;i<argc;++i) args.emplace_back(argv[i]);
-            return linux_elf(argv[2],budget,args,std::string_view(argv[1])=="--run-linux-elf-stdin");
+            return linux_elf(argv[2],budget,args,std::string_view(argv[1])=="--run-linux-elf-stdin",std::string_view(argv[1])=="--run-linux-elf-fixture");
         }
         if (std::string_view(argv[1])=="--inspect-elf") {
             if(argc!=3) { std::cerr << "Usage: nightfall_cli --inspect-elf file\n"; return 2; }

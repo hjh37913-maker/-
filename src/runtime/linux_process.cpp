@@ -42,7 +42,26 @@ bool prepare_linux_stack(Machine& machine,std::uint64_t base,std::size_t size,st
         return true;
     } catch(const std::bad_alloc&) { return false; } catch(const std::length_error&) { return false; }
 }
-LinuxProcess::LinuxProcess(Machine& machine,std::size_t max_output) : machine_(machine),max_output_(max_output) {}
+LinuxProcess::LinuxProcess(Machine& machine,std::size_t max_output) : machine_(machine),max_output_(max_output) {
+    descriptors_[0].kind=FdKind::input; descriptors_[1].kind=FdKind::output; descriptors_[2].kind=FdKind::error;
+}
+bool LinuxProcess::add_test_file(std::string path,std::span<const std::uint8_t> bytes) {
+    constexpr std::size_t max_files=8,max_file=65536,max_total=262144;
+    if(started_ || exited_ || path.empty() || path[0]!='/' || path.size()>255 || path.find('\0')!=std::string::npos ||
+       files_.size()>=max_files || bytes.size()>max_file || bytes.size()>max_total-file_bytes_) return false;
+    for(const auto& file:files_) if(file.path==path) return false;
+    try {
+        TestFile file; file.path=std::move(path); if(!bytes.empty()) file.bytes.assign(bytes.begin(),bytes.end());
+        files_.push_back(std::move(file)); file_bytes_+=bytes.size(); return true;
+    } catch(const std::bad_alloc&) { return false; } catch(const std::length_error&) { return false; }
+}
+LinuxProcess::ReadSource LinuxProcess::read_source(std::uint32_t fd) noexcept {
+    if(fd>=descriptors_.size()) return {};
+    auto& desc=descriptors_[fd];
+    if(desc.kind==FdKind::input) return {&stdin_,&stdin_cursor_};
+    if(desc.kind==FdKind::file) return {&files_[desc.file_index].bytes,&desc.cursor};
+    return {};
+}
 bool LinuxProcess::set_stdin(std::span<const std::uint8_t> bytes) {
     if(started_ || exited_ || bytes.size()>65536) return false;
     try { std::vector<std::uint8_t> staged; if(!bytes.empty()) staged.assign(bytes.begin(),bytes.end()); stdin_=std::move(staged); stdin_cursor_=0; return true; }
@@ -66,6 +85,45 @@ void LinuxProcess::dispatch() {
     // Userspace-observable syscall return registers. Kernel mode and FMASK are not modeled.
     *state.reg(1)=state.rip+2; *state.reg(11)=state.rflags; state.rip+=2;
     if(number==60 || number==231) { exited_=true; exit_code_=static_cast<std::uint8_t>(arg0); return; }
+    if(number==2 || number==257) { // open/openat: immutable synthetic files only
+        const auto path_address=number==2?arg0:arg1; const auto flags=static_cast<std::uint32_t>(number==2?arg1:arg2);
+        if(number==257 && static_cast<std::uint32_t>(arg0)!=0xffffff9cU) { state.rax=err(9); return; } // AT_FDCWD
+        if(flags&3) { state.rax=err(30); return; } // read-only fixture table
+        if(flags&~0x80000U) { state.rax=err(22); return; } // optional O_CLOEXEC
+        try {
+            std::string path; bool terminated=false;
+            for(std::size_t i=0;i<256;++i) {
+                if(path_address>std::numeric_limits<std::uint64_t>::max()-i) { state.rax=err(14); return; }
+                std::array<std::uint8_t,1> ch{};
+                if(!machine_.memory.read(path_address+i,ch)) { state.rax=err(14); return; }
+                if(!ch[0]) { terminated=true; break; }
+                path.push_back(static_cast<char>(ch[0]));
+            }
+            if(!terminated) { state.rax=err(36); return; }
+            std::size_t file=0; while(file<files_.size() && files_[file].path!=path) ++file;
+            if(file==files_.size()) { state.rax=err(2); return; }
+            std::size_t fd=0; while(fd<descriptors_.size() && descriptors_[fd].kind!=FdKind::unused) ++fd;
+            if(fd==descriptors_.size()) { state.rax=err(24); return; }
+            descriptors_[fd]={FdKind::file,file,0}; state.rax=fd; return;
+        } catch(const std::bad_alloc&) { state.rax=err(12); return; } catch(const std::length_error&) { state.rax=err(12); return; }
+    }
+    if(number==3) { // close any modeled descriptor; no host descriptor exists.
+        const auto fd=static_cast<std::uint32_t>(arg0);
+        if(fd>=descriptors_.size() || descriptors_[fd].kind==FdKind::unused) { state.rax=err(9); return; }
+        descriptors_[fd]={}; state.rax=0; return;
+    }
+    if(number==8) { // lseek: synthetic regular files only, signed offset
+        const auto fd=static_cast<std::uint32_t>(arg0), whence=static_cast<std::uint32_t>(arg2);
+        if(fd>=descriptors_.size() || descriptors_[fd].kind==FdKind::unused) { state.rax=err(9); return; }
+        auto& desc=descriptors_[fd]; if(desc.kind!=FdKind::file) { state.rax=err(29); return; }
+        if(whence>2) { state.rax=err(22); return; }
+        const std::uint64_t origin=whence==0?0:whence==1?desc.cursor:files_[desc.file_index].bytes.size();
+        constexpr auto max_offset=std::uint64_t{0x7fffffffffffffffULL};
+        std::uint64_t target=0;
+        if(arg1>>63) { const auto magnitude=~arg1+1; if(magnitude>origin) { state.rax=err(22); return; } target=origin-magnitude; }
+        else { if(arg1>max_offset-origin) { state.rax=err(22); return; } target=origin+arg1; }
+        desc.cursor=target; state.rax=target; return;
+    }
     if(number==9 || number==10 || number==11) { // bounded anonymous mmap/mprotect/munmap subset
         if(!mmap_configured_) { state.rax=err(38); return; }
         constexpr std::uint64_t page=4096, max_map=1024*1024;
@@ -123,7 +181,8 @@ void LinuxProcess::dispatch() {
     }
     if(number==19) { // readv: input and destination validation before mutation
         const auto fd=static_cast<std::uint32_t>(arg0), count=static_cast<std::uint32_t>(arg2);
-        if(fd!=0) { state.rax=err(9); return; }
+        const auto source=read_source(fd);
+        if(!source.bytes) { state.rax=err(9); return; }
         if(count>1024) { state.rax=err(22); return; }
         if(!count) { state.rax=0; return; }
         try {
@@ -138,7 +197,8 @@ void LinuxProcess::dispatch() {
                 if(len>std::uint64_t{0x7fffffffffffffffULL}-total) { state.rax=err(22); return; }
                 total+=len;
             }
-            const auto available=stdin_.size()-stdin_cursor_;
+            const auto cursor=*source.cursor;
+            const auto available=cursor>=source.bytes->size()?std::size_t{0}:source.bytes->size()-static_cast<std::size_t>(cursor);
             const auto amount=total<available?static_cast<std::size_t>(total):available;
             // Validate only the portions that this short read will actually touch.
             std::size_t left=amount;
@@ -152,16 +212,16 @@ void LinuxProcess::dispatch() {
             for(std::uint32_t i=0;i<count && left;++i) {
                 const auto off=static_cast<std::size_t>(i)*16, len=read64(table,off+8);
                 const auto n=len<left?static_cast<std::size_t>(len):left;
-                if(n && !machine_.memory.write(read64(table,off),std::span<const std::uint8_t>(stdin_).subspan(stdin_cursor_+consumed,n))) { state.rax=err(14); return; }
+                if(n && !machine_.memory.write(read64(table,off),std::span<const std::uint8_t>(*source.bytes).subspan(static_cast<std::size_t>(cursor)+consumed,n))) { state.rax=err(14); return; }
                 left-=n; consumed+=n;
             }
-            stdin_cursor_+=amount; state.rax=amount; return;
+            *source.cursor+=amount; state.rax=amount; return;
         } catch(const std::bad_alloc&) { state.rax=err(12); return; }
           catch(const std::length_error&) { state.rax=err(12); return; }
     }
     if(number==20) { // writev: bounded, validated guest iovec array
         const auto fd=static_cast<std::uint32_t>(arg0), count=static_cast<std::uint32_t>(arg2);
-        if(fd!=1 && fd!=2) { state.rax=err(9); return; }
+        if(fd>=descriptors_.size() || (descriptors_[fd].kind!=FdKind::output && descriptors_[fd].kind!=FdKind::error)) { state.rax=err(9); return; }
         if(count>1024) { state.rax=err(22); return; } // EINVAL
         if(!count) { state.rax=0; return; }
         if(stdout_.size()>max_output_ || stderr_.size()>max_output_-stdout_.size()) { state.rax=err(27); return; }
@@ -186,21 +246,26 @@ void LinuxProcess::dispatch() {
                 if(len && !machine_.memory.read(address,std::span(bytes).subspan(pos,len))) { state.rax=err(14); return; }
                 pos+=len;
             }
-            auto& out=fd==1?stdout_:stderr_; out.insert(out.end(),bytes.begin(),bytes.end()); state.rax=total; return;
+            auto& out=descriptors_[fd].kind==FdKind::output?stdout_:stderr_; out.insert(out.end(),bytes.begin(),bytes.end()); state.rax=total; return;
         } catch(const std::bad_alloc&) { state.rax=err(12); return; }
           catch(const std::length_error&) { state.rax=err(12); return; }
     }
-    if(number==0) { // read: synthetic pre-supplied stdin only
-        if(static_cast<std::uint32_t>(arg0)!=0) { state.rax=err(9); return; }
-        const auto available=stdin_.size()-stdin_cursor_;
+    if(number==0 || number==17) { // read/pread64: synthetic inputs only
+        const auto fd=static_cast<std::uint32_t>(arg0); const auto source=read_source(fd);
+        if(!source.bytes) { state.rax=err(9); return; }
+        if(number==17 && descriptors_[fd].kind!=FdKind::file) { state.rax=err(29); return; }
+        const auto cursor=number==17?*state.reg(10):*source.cursor;
+        if(number==17 && (cursor>>63)) { state.rax=err(22); return; }
+        const auto available=cursor>=source.bytes->size()?std::size_t{0}:source.bytes->size()-static_cast<std::size_t>(cursor);
         const auto amount=arg2<available?static_cast<std::size_t>(arg2):available;
         if(!amount) { state.rax=0; return; }
-        if(!machine_.memory.write(arg1,std::span<const std::uint8_t>(stdin_).subspan(stdin_cursor_,amount))) { state.rax=err(14); return; }
-        stdin_cursor_+=amount; state.rax=amount; return;
+        if(!machine_.memory.write(arg1,std::span<const std::uint8_t>(*source.bytes).subspan(static_cast<std::size_t>(cursor),amount))) { state.rax=err(14); return; }
+        if(number==0) *source.cursor+=amount;
+        state.rax=amount; return;
     }
     if(number!=1) { state.rax=err(38); return; } // ENOSYS
     const auto fd=static_cast<std::uint32_t>(arg0); // Linux write receives an unsigned int fd.
-    if(fd!=1 && fd!=2) { state.rax=err(9); return; } // EBADF
+    if(fd>=descriptors_.size() || (descriptors_[fd].kind!=FdKind::output && descriptors_[fd].kind!=FdKind::error)) { state.rax=err(9); return; } // EBADF
     if(arg2==0) { state.rax=0; return; }
     if(stdout_.size()>max_output_ || stderr_.size()>max_output_-stdout_.size()) { state.rax=err(27); return; }
     const auto used=stdout_.size()+stderr_.size();
@@ -208,7 +273,7 @@ void LinuxProcess::dispatch() {
     try {
         std::vector<std::uint8_t> bytes(static_cast<std::size_t>(arg2));
         if(!machine_.memory.read(arg1,bytes)) { state.rax=err(14); return; } // EFAULT
-        auto& out=fd==1?stdout_:stderr_;
+        auto& out=descriptors_[fd].kind==FdKind::output?stdout_:stderr_;
         out.insert(out.end(),bytes.begin(),bytes.end()); state.rax=arg2;
     } catch(const std::bad_alloc&) { state.rax=err(12); } // ENOMEM
       catch(const std::length_error&) { state.rax=err(12); }
