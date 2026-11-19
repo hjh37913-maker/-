@@ -113,7 +113,10 @@ The caller assertions do not load modules or prove that any implementation
 exists. No real console module or OS library is provided.
 The sole executable scenario is a **synthetic test constructed from scratch**,
 with a synthetic guest stub and a Linux test exit, checked at three load biases
-on both memory backends. The API is not exposed as a PS5 game launch mode.
+on both memory backends. An additional Linux native test compares the result
+with equivalent authored import/call logic linked by the native dynamic linker;
+the native file and format differ, so this does not validate SCE semantics.
+The API is not exposed as a PS5 game launch mode.
 
 This is not a full PS5 loader, ABI, dynamic linker, sandbox, or a validated
 implementation of console behavior. No authentic PS5 executable, protected
@@ -126,3 +129,8 @@ identify its platform or establish validity/compatibility.
 The SCE-style relocation arithmetic model exercises 5,000 generated cases
 per test over all four modeled relocation types, randomized load biases,
 values and addends; this is a software reference, not a native PS5 oracle.
+
+The synthetic SCE-style loader additionally has a 5,000-input deterministic
+mutation/rollback test. It checks state invariants, not PS5 semantics, security
+isolation, or independent CPU execution. The equivalent native Linux case
+uses a separately authored ELF, not the same SCE-style container.

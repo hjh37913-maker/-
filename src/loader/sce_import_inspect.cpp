@@ -3,6 +3,7 @@
 #include "storage/storage.h"
 #include <span>
 #include <system_error>
+#include <utility>
 namespace nightfall::loader {
 namespace {
 std::uint64_t le(std::span<const std::uint8_t>b,std::size_t p,unsigned n){std::uint64_t x=0;for(unsigned i=0;i<n;++i)x|=std::uint64_t(b[p+i])<<(8*i);return x;}

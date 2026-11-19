@@ -17,8 +17,22 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 150 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 152 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current synthetic raw-loader mutation coverage
+
+Added deterministic malformed-input/rollback testing for the restricted
+SCE-style raw loader. Linux Debug, Release, ASan+UBSan and a clean Release
+passed 152/152 tests each. Windows x64 portable mutation tests were
+cross-compiled but not executed. These inputs are synthetic and do not prove
+PS5 or game compatibility or isolation.
+
+## Current equivalent native import comparison
+
+An original native Linux ELF importing a synthetic function and the synthetic
+SCE-style guest case return the same value. The containers and linkers differ;
+this is a comparison of equivalent logic, not a PS5 format or game test.
 
 ## Current explicit SCE-style dependency identities
 

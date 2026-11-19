@@ -12,6 +12,6 @@ struct SceDependencyBinding {
 // are caller assertions, not loaded modules. Failure preserves machine.
 ElfStatus load_sce_raw_relocatable(std::span<const std::uint8_t> file,Machine& machine,
                                   std::uint64_t bias,std::uint64_t stack_base,std::size_t stack_size,
-                                  std::span<const ImportBinding> bindings={},std::string* missing_symbol=nullptr,
+                                  std::span<const ImportBinding> bindings={},std::string* missing_name=nullptr,
                                   std::span<const SceDependencyBinding> dependencies={});
 }
