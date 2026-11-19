@@ -17,8 +17,17 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 147 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 148 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current candidate SCE-style import inspection
+
+Added passive bounded metadata inspection for unprotected raw ELF headers and
+OS-specific import table tags observed in a public PS5 project. Only synthetic
+fixtures have been tested; output is not platform identification or support.
+The inspector does not decrypt, resolve symbols, load code, or launch games.
+Linux Debug, Release and ASan+UBSan passed 148/148 each; Windows CLI
+cross-compiled but did not run on Windows. See research/PS5_ARCHITECTURE.md.
 
 ## Current missing-import diagnostics
 

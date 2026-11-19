@@ -3,6 +3,7 @@
 #include "loader/elf64.h"
 #include "loader/static_pie.h"
 #include "loader/elf_inspect.h"
+#include "loader/sce_import_inspect.h"
 #include "runtime/linux_process.h"
 #include <array>
 #include <charconv>
@@ -167,6 +168,21 @@ int linux_elf(const char* path,std::size_t budget,std::span<const std::string> a
     return 1;
 }
 
+int inspect_sce(const char* path) {
+    const auto report=nightfall::loader::inspect_sce_imports(path);
+    if(report.status!=nightfall::loader::SceInspectStatus::ok) {
+        std::cerr << "Raw candidate ELF import inspection failed: " << nightfall::loader::sce_inspect_status_name(report.status) << '\n';
+        return 1;
+    }
+    std::cout << "Raw candidate SCE-style ELF metadata only; platform and game compatibility are NOT established.\n"
+              << "No code was loaded or executed; encrypted containers are not supported.\n"
+              << "Undefined global/weak symbol entries=" << report.imports.size() << '\n';
+    for(const auto& item:report.imports)
+        std::cout << "symbol[" << item.symbol_index << "] binding=" << unsigned(item.binding) << " type=" << unsigned(item.type)
+                  << " name=" << escaped_symbol(item.encoded_name) << '\n';
+    return 0;
+}
+
 int inspect(const char* path) {
     const auto info=nightfall::loader::inspect_elf64(path);
     if(info.status!=nightfall::loader::InspectStatus::ok) {
@@ -201,6 +217,10 @@ int main(int argc,char** argv) {
             std::vector<std::string> args{"nightfall-guest"};
             for(int i=4;i<argc;++i) args.emplace_back(argv[i]);
             return linux_elf(argv[2],budget,args,std::string_view(argv[1])=="--run-linux-elf-stdin",std::string_view(argv[1])=="--run-linux-elf-fixture",std::string_view(argv[1])=="--run-linux-static-pie");
+        }
+        if (std::string_view(argv[1])=="--inspect-sce-imports") {
+            if(argc!=3) { std::cerr << "Usage: nightfall_cli --inspect-sce-imports unprotected-elf\n"; return 2; }
+            return inspect_sce(argv[2]);
         }
         if (std::string_view(argv[1])=="--inspect-elf") {
             if(argc!=3) { std::cerr << "Usage: nightfall_cli --inspect-elf file\n"; return 2; }

@@ -67,3 +67,27 @@ without an actual game test, build, logs or reproducible result; it does not
 establish either compatibility or incompatibility. No game or protected file
 was obtained or executed, and no upstream source code was copied. NIGHTFALL's
 new generic unprotected ELF relocation/import work is not a PS5 loader.
+
+### Passive candidate import-table inspection
+
+As a small PS5-directed research step, `--inspect-sce-imports` reads only
+raw, unprotected little-endian x86-64 ELF metadata. The candidate OSABI,
+object/header types and OS-specific table tags are factual values observed in
+[KytyPS5's public header](https://github.com/KytyPS5/KytyPS5/blob/5ad27cdd1aeb48a7885b1a71d5a8321590b31ecd/src/loader/elf.h)
+and its [runtime linker](https://github.com/KytyPS5/KytyPS5/blob/5ad27cdd1aeb48a7885b1a71d5a8321590b31ecd/src/loader/runtimeLinker.cpp),
+reviewed 2026-11-19. The implementation is original and intentionally limited;
+no upstream source code was copied. These values are *candidate* hints, not
+proof that a file targets PS5 or is valid, authorized, or compatible. This
+has only been tested using independently authored synthetic metadata; no
+actual PS5 executable or game was available for verification.
+
+The inspector reads bounded program headers, a bounded dynamic table, the
+OS-specific symbol/string tables relative to the declared metadata segment,
+and lists encoded names of undefined global/weak symbols. It neither decodes
+NIDs/module qualifiers nor resolves them. Names are escaped in CLI output. It
+rejects non-ELF input outright and never parses SELF or other protected
+containers, decrypts data, loads segments, or runs code. It is not a PS5
+loader, compatibility verdict, security boundary, or indication GTA VI runs.
+Ranges and counts are capped; the host file can change between individual
+reads, and allocation errors can propagate. Example for a trusted raw test
+file: `nightfall_cli --inspect-sce-imports fixture.elf`.
