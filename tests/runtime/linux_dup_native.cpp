@@ -2,11 +2,12 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <cstdlib>
 #include <sys/mman.h>
 #include <unistd.h>
 using namespace nightfall;using namespace nightfall::runtime;
 std::uint64_t call(LinuxProcess& p,Machine& m,std::uint64_t n,std::uint64_t a,std::uint64_t b=0,std::uint64_t c=0){m.cpu.state.rip=0;m.cpu.state.rax=n;*m.cpu.state.reg(7)=a;*m.cpu.state.reg(6)=b;*m.cpu.state.reg(2)=c;if(p.run(1).result!=ProcessResult::budget_exhausted)return UINT64_MAX;return m.cpu.state.rax;}
-int main(){std::uint64_t seed=0x5c741f106495aa83ULL;unsigned comparisons=0;auto rnd=[&](){seed^=seed<<13;seed^=seed>>7;seed^=seed<<17;return seed;};
+int main(int argc,char** argv){std::uint64_t seed=argc>1?std::strtoull(argv[1],nullptr,0):0x5c741f106495aa83ULL;if(!seed)seed=1;unsigned comparisons=0;auto rnd=[&](){seed^=seed<<13;seed^=seed>>7;seed^=seed<<17;return seed;};
  const std::array<std::uint8_t,26> data{'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'};
  for(unsigned scenario=0;scenario<256;++scenario){
   Machine m(4096);const std::array<std::uint8_t,2> code{15,5};const std::array<std::uint8_t,3> path{'/','f',0};if(!m.memory.write(0,code)||!m.memory.write(64,path))return 1;LinuxProcess p(m);if(!p.add_test_file("/f",data))return 1;
