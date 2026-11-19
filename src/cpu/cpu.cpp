@@ -126,40 +126,91 @@ StepResult Cpu::step(Memory& memory) {
         ++state.rip;
         return b[0] == 0xf4 ? StepResult::halted : StepResult::running;
     }
-    // MOVZX r32/r64, r/m8 or r/m16. 0x40..0x4f REX changes the
-    // byte-register encoding (AH..BH become SPL..DIL), even without REX.W.
-    // Other non-W REX instruction forms remain unsupported.
+    // MOVZX/MOVSX r32/r64, r/m8 or r/m16, and MOVSXD r64, r/m32.
+    // Any REX prefix replaces AH..BH with SPL..DIL for byte sources.
     if (b[0]==0x0f || (b[0]>=0x40 && b[0]<=0x4f)) {
         const bool has_rex=b[0]!=0x0f;
         const unsigned op_pos=has_rex?1:0;
         if (has_rex && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        const std::uint8_t rex=has_rex?b[0]:0;
+        unsigned op=0, modrm_pos=0, width=0;
+        bool is_signed=false;
         if (b[op_pos]==0x0f) {
             if (!memory.fetch(state.rip,std::span(b).first(op_pos+2))) return StepResult::memory_fault;
-            const unsigned op=b[op_pos+1];
-            if (op==0xb6 || op==0xb7) {
-                const unsigned modrm_pos=op_pos+2;
-                if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
-                const unsigned mod=b[modrm_pos]>>6, low_rm=b[modrm_pos]&7;
-                const std::uint8_t rex=has_rex?b[0]:0;
-                const unsigned reg=((b[modrm_pos]>>3)&7)+((rex&4)?8:0);
-                unsigned length=modrm_pos+1; std::uint64_t value=0;
-                if (mod==3) {
-                    if (op==0xb6 && !has_rex && low_rm>=4)
-                        value=(*state.reg(low_rm-4)>>8)&0xff; // AH/CH/DH/BH
-                    else {
-                        value=*state.reg(low_rm+((rex&1)?8:0));
-                        value &= op==0xb6 ? 0xff : 0xffff;
-                    }
-                } else {
-                    std::uint64_t address=0;
-                    if (!effective_address(memory,state,b,modrm_pos,rex,0,address,length)) return StepResult::memory_fault;
-                    std::array<std::uint8_t,2> data{}; const unsigned width=op==0xb6?1:2;
-                    if (!memory.read(address,std::span(data).first(width))) return StepResult::memory_fault;
-                    value=little(data.data(),width);
+            op=b[op_pos+1]; modrm_pos=op_pos+2;
+            if (op==0xb6 || op==0xbe) width=1;
+            else if (op==0xb7 || op==0xbf) width=2;
+            is_signed=op==0xbe || op==0xbf;
+        } else if (has_rex && (rex&8) && b[op_pos]==0x63) {
+            width=4; is_signed=true; modrm_pos=op_pos+1;
+        }
+        if (width) {
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned mod=b[modrm_pos]>>6, low_rm=b[modrm_pos]&7;
+            const unsigned reg=((b[modrm_pos]>>3)&7)+((rex&4)?8:0);
+            unsigned length=modrm_pos+1; std::uint64_t value=0;
+            if (mod==3) {
+                if (width==1 && !has_rex && low_rm>=4)
+                    value=(*state.reg(low_rm-4)>>8)&0xff; // AH/CH/DH/BH
+                else {
+                    value=*state.reg(low_rm+((rex&1)?8:0));
+                    value &= width==1 ? 0xffULL : width==2 ? 0xffffULL : 0xffffffffULL;
                 }
-                *state.reg(reg)=value; state.rip+=length; // r32 writes zero-extend too.
-                return StepResult::running;
+            } else {
+                std::uint64_t address=0;
+                if (!effective_address(memory,state,b,modrm_pos,rex,0,address,length)) return StepResult::memory_fault;
+                std::array<std::uint8_t,4> data{};
+                if (!memory.read(address,std::span(data).first(width))) return StepResult::memory_fault;
+                value=little(data.data(),width);
             }
+            if (is_signed) value=sign_extend(value,width*8);
+            if (!(rex&8)) value=static_cast<std::uint32_t>(value); // r32 writes zero-extend.
+            *state.reg(reg)=value; state.rip+=length;
+            return StepResult::running;
+        }
+    }
+    // Byte MOV between registers/memory, and MOV r/m8, imm8 (C6 /0).
+    // Legacy high-byte registers are available only without any REX prefix.
+    if (b[0]==0x88 || b[0]==0x8a || b[0]==0xc6 || (b[0]>=0x40 && b[0]<=0x4f)) {
+        const bool has_rex=b[0]>=0x40 && b[0]<=0x4f;
+        const auto rex=has_rex?b[0]:std::uint8_t{0}; const unsigned op_pos=has_rex?1:0;
+        if (has_rex && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        const auto op=b[op_pos];
+        if (op==0x88 || op==0x8a || op==0xc6) {
+            const unsigned modrm_pos=op_pos+1;
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned mod=b[modrm_pos]>>6, low_rm=b[modrm_pos]&7, low_reg=(b[modrm_pos]>>3)&7;
+            if (op==0xc6 && low_reg!=0) return StepResult::invalid_instruction;
+            auto read_byte_reg=[&](unsigned low, bool extended) -> std::uint8_t {
+                if (!has_rex && low>=4) return static_cast<std::uint8_t>(*state.reg(low-4)>>8);
+                return static_cast<std::uint8_t>(*state.reg(low+(extended?8:0)));
+            };
+            auto write_byte_reg=[&](unsigned low, bool extended, std::uint8_t value) {
+                const bool high=!has_rex && low>=4;
+                auto& target=*state.reg(high?low-4:low+(extended?8:0));
+                const unsigned shift=high?8:0;
+                target=(target & ~(std::uint64_t{0xff}<<shift)) | (std::uint64_t(value)<<shift);
+            };
+            unsigned length=modrm_pos+1; const unsigned trailing=op==0xc6?1:0;
+            if (mod==3) {
+                length+=trailing;
+                if (trailing && !memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
+                const auto value=op==0xc6?b[length-1]:op==0x88?read_byte_reg(low_reg,rex&4):read_byte_reg(low_rm,rex&1);
+                if (op==0x8a) write_byte_reg(low_reg,rex&4,value);
+                else write_byte_reg(low_rm,rex&1,value);
+            } else {
+                std::uint64_t address=0;
+                if (!effective_address(memory,state,b,modrm_pos,rex,trailing,address,length)) return StepResult::memory_fault;
+                if (op==0x8a) {
+                    std::array<std::uint8_t,1> data{};
+                    if (!memory.read(address,data)) return StepResult::memory_fault;
+                    write_byte_reg(low_reg,rex&4,data[0]);
+                } else {
+                    const std::array<std::uint8_t,1> data{op==0xc6?b[length-1]:read_byte_reg(low_reg,rex&4)};
+                    if (!memory.write(address,data)) return StepResult::memory_fault;
+                }
+            }
+            state.rip+=length; return StepResult::running;
         }
     }
     // Near indirect CALL/JMP and PUSH r/m64 (FF /2, /4, /6).
@@ -193,6 +244,20 @@ StepResult Cpu::step(Memory& memory) {
             return StepResult::running;
         }
     }
+    // Accumulator logical operations with imm32. REX.W sign-extends imm32.
+    const bool acc_wide=b[0]==0x48;
+    if (!acc_wide || memory.fetch(state.rip,std::span(b).first(2))) {
+        const auto op=acc_wide?b[1]:b[0];
+        if (op==0x0d || op==0x25 || op==0x35) {
+            const unsigned offset=acc_wide?2:1, length=offset+4;
+            if (!memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
+            const auto imm=little(b.data()+offset,4);
+            const unsigned ext=op==0x0d?1:op==0x25?4:6;
+            if (acc_wide) group_logical64(state,state.rax,sign_extend(imm,32),ext);
+            else group_logical32(state,state.rax,static_cast<std::uint32_t>(imm),ext);
+            state.rip+=length; return StepResult::running;
+        }
+    } else return StepResult::memory_fault;
     // MOV r32, imm32 zero-extends into the corresponding 64-bit register.
     if (b[0]>=0xb8 && b[0]<=0xbf) {
         if (!memory.fetch(state.rip,std::span(b).first(5))) return StepResult::memory_fault;

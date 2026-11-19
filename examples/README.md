@@ -76,3 +76,13 @@ be executed directly on the host. It does not exercise OS or PS5 services.
 compiled using GCC 12.2 and the flags above. `nightfall_cli --run-elf
 examples/movzx-demo.elf 100` stops at synthetic HLT with RAX=42. **Do not
 execute the ELF on the host**. This does not exercise a console runtime.
+
+## Signed extension and byte transfer fixtures
+`movsx-demo.c` sums original signed byte, short, and int values to 42; the
+GCC 12.2 ELF exercises MOVSX and MOVSXD. `mov8-demo.c` writes a byte to a
+volatile location and reads it back (42). `byte-loop-demo.c` copies three
+signed bytes and returns their sum, 42; GCC 12.2 unrolled the loop in the
+checked-in ELF. The integration test checks both the return value and the
+three guest-memory output bytes. Build with the freestanding flags above.
+These files contain synthetic HLT and **must not be executed on the host**.
+They are original test programs, not PS5 software.

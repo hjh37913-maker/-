@@ -43,3 +43,15 @@ Implemented the x86 MOVZX byte/word source forms, including REX and high-byte
 register semantics. Native Linux x86-64 comparisons cover memory sources;
 portable checks cover register encodings and faults. This enables an original
 freestanding C byte-read fixture, not PS5 binaries or games.
+
+### Signed extension and byte transfers (2026-11-19)
+Added MOVSX byte/word and REX.W MOVSXD, byte MOV register/memory/immediate,
+and accumulator logical immediate instructions. Portable tests check aliases,
+legacy high-byte and REX low-byte registers, memory permissions and faults.
+Linux x86-64 native checks cover 40,960 sign-extension memory cases and
+32,768 byte memory transfers. 49,152 accumulator-immediate comparisons use
+native register operations as oracle rather than the immediate encoding.
+Three original freestanding C fixtures exercise these operations; an integration
+check validates byte copies in guest memory. Windows x64 tests cross-compiled,
+but could not be run on Windows. No PS5 operating system, graphics stack or
+game support is implied.
