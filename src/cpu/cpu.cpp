@@ -510,6 +510,7 @@ StepResult Cpu::step(Memory& memory) {
     }
     if (b[0]==0x0f) {
         if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        if (b[1]==0x05) return StepResult::syscall_trap; // Runtime decides whether/how to handle it.
         if (b[1]<0x80 || b[1]>0x8f) return StepResult::invalid_instruction;
         if (!memory.fetch(state.rip,std::span(b).first(6))) return StepResult::memory_fault;
         const bool taken=condition(b[1]&15,state.rflags);

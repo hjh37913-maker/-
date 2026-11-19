@@ -98,6 +98,9 @@ bool Memory::protect(std::uint64_t address,std::size_t count,Permission permissi
     }
     return true;
 }
+bool Memory::can_access(std::uint64_t address,std::size_t count,Permission permission) const noexcept {
+    return valid(permission) && accessible(address,count,permission);
+}
 bool Memory::copy_out(std::uint64_t address,std::span<std::uint8_t> out,Permission permission) const {
     if(!accessible(address,out.size(),permission)) return false;
     if(!sparse_) { std::copy_n(bytes_.begin()+static_cast<std::size_t>(address),out.size(),out.begin()); return true; }

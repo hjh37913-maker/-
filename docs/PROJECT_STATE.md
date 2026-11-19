@@ -7,18 +7,22 @@
 | Architecture | Initial design | MASTER_ARCHITECTURE.md |
 | Core | TESTED | Budgeted synthetic machine, CTest on Linux |
 | CPU | TESTED, narrowly | 16 GPRs; register MOV/ADD/SUB/CMP, selected MOV memory, immediate and branch forms; native differential tests cover selected cases, not exhaustive |
-| Memory | TESTED, narrowly | Fixed-capacity, byte-granular experimental map/protect/unmap, R/W/X checks and counts; not a console memory model |
+| Memory | TESTED, narrowly | Flat and bounded sparse experimental memory, map/protect/unmap and R/W/X checks; not a console memory model |
 | Storage | TESTED, narrowly | Synchronous bounded host-file ranges and CRC-32; 40 checks, no PS5 compatibility |
 | Input | TESTED, narrowly | Core synthetic mapper; browser keyboard/mouse diagnostic only, no guest input |
-| Graphics experiment | TESTED, narrowly | CPU-only clear/fill/copy surface; no GPU or PS5 compatibility |
+| Graphics experiment | TESTED, narrowly | CPU-only surface, triangle rasterization and depth experiment; no GPU or PS5 compatibility |
 | ELF64 test loader | TESTED, narrowly | Loads a restricted original x86-64 ELF64 fixture, not PS5 binaries |
-| Runtime experiment | TESTED, narrowly | Deterministic standalone timer queue; no guest ABI or host scheduler |
+| Runtime experiment | TESTED, narrowly | Deterministic timer and bounded synthetic Linux x86-64 test ABI; not PS5 or a host scheduler |
 | GPU, shader translation | NOT_IMPLEMENTED | No compatibility implementation |
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
-| Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows untested |
-| Coverage | Measured, limited | 51 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
+| Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
+| Coverage | Measured, limited | 101 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Latest bounded Linux test ABI batch
+
+Original static test ELFs can exercise a minimal startup stack, buffered read/write and vector I/O, bounded synthetic heap and exit through a modeled syscall trap. All 101 tests passed on Linux Debug, Release and ASan+UBSan. Native private-pipe comparisons cover selected cases only; Windows binaries were cross-compiled but not run. This is not a PS5 ABI, sandbox or game launcher. See LINUX_TEST_ABI.md.
 
 ## Continuation priorities
 1. Expand differential testing to further instructions and more arithmetic cases, and verify fault/decoding semantics; avoid assuming undocumented guest CPU features.

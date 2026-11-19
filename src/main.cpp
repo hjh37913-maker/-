@@ -2,6 +2,7 @@
 #include "storage/storage.h"
 #include "loader/elf64.h"
 #include "loader/elf_inspect.h"
+#include "runtime/linux_process.h"
 #include <array>
 #include <charconv>
 #include <cstdint>
@@ -10,11 +11,17 @@
 #include <iomanip>
 #include <string_view>
 #include <system_error>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#include <cstdio>
+#endif
 namespace {
 constexpr std::size_t capacity=65536, default_budget=10000, max_budget=1000000;
 const char* name(nightfall::RunResult result) {
     switch (result) {
     case nightfall::RunResult::halted: return "halted";
+    case nightfall::RunResult::syscall_trap: return "syscall_trap";
     case nightfall::RunResult::invalid_instruction: return "invalid_instruction";
     case nightfall::RunResult::memory_fault: return "memory_fault";
     case nightfall::RunResult::budget_exhausted: return "budget_exhausted";
@@ -76,6 +83,51 @@ int elf(const char* path,std::size_t budget,bool sparse=false) {
     return result==nightfall::RunResult::halted?0:1;
 }
 
+int linux_elf(const char* path,std::size_t budget,std::span<const std::string> args,bool read_stdin) {
+    constexpr std::uint64_t virtual_size=1ULL<<44;
+    constexpr std::size_t stack_size=65536, image_limit=1024*1024, max_pages=4096;
+    if(sizeof(std::size_t)<8) { std::cerr << "Linux test mode requires a 64-bit host.\n"; return 1; }
+    std::error_code ec; const auto size=std::filesystem::file_size(path,ec);
+    if(ec || !size || size>image_limit) { std::cerr << "Invalid original test ELF size.\n"; return 1; }
+    auto data=nightfall::storage::read_range(path,0,static_cast<std::size_t>(size),image_limit);
+    if(data.status!=nightfall::storage::ReadStatus::ok) { std::cerr << "Test ELF read failed.\n"; return 1; }
+    nightfall::Machine machine(static_cast<std::size_t>(virtual_size),nightfall::SparsePages{max_pages});
+    auto status=nightfall::loader::load_elf64(data.bytes,machine,virtual_size-stack_size,stack_size);
+    if(status!=nightfall::loader::ElfStatus::ok) { std::cerr << "Test ELF rejected: " << nightfall::loader::elf_status_name(status) << '\n'; return 1; }
+    if(!nightfall::runtime::prepare_linux_stack(machine,virtual_size-stack_size,stack_size,args)) { std::cerr << "Cannot prepare bounded test process stack.\n"; return 1; }
+    nightfall::runtime::LinuxProcess process(machine);
+    // Fixed test-only heap; overlap with loaded mappings fails safely on brk growth.
+    if(!process.configure_brk(0x80000000ULL,0x80100000ULL)) { std::cerr << "Test heap setup failed.\n"; return 1; }
+#ifdef _WIN32
+    // Captured guest output and explicitly supplied stdin are byte streams.
+    if(_setmode(_fileno(stdout),_O_BINARY)==-1 || _setmode(_fileno(stderr),_O_BINARY)==-1 || (read_stdin && _setmode(_fileno(stdin),_O_BINARY)==-1)) {
+        std::cerr << "Cannot set binary test streams.\n"; return 1;
+    }
+#endif
+    if(read_stdin) {
+        std::vector<std::uint8_t> input; std::array<char,4096> chunk{};
+        while(true) {
+            std::cin.read(chunk.data(),static_cast<std::streamsize>(chunk.size()));
+            const auto got=static_cast<std::size_t>(std::cin.gcount());
+            if(got>65536-input.size()) { std::cerr << "Test stdin exceeds 65536 bytes.\n"; return 1; }
+            input.insert(input.end(),chunk.data(),chunk.data()+got);
+            if(std::cin.eof()) break;
+            if(!std::cin) { std::cerr << "Test stdin read failed.\n"; return 1; }
+        }
+        if(!process.set_stdin(input)) { std::cerr << "Test stdin setup failed.\n"; return 1; }
+    }
+    const auto report=process.run(budget);
+    if(!process.stdout_bytes().empty()) std::cout.write(reinterpret_cast<const char*>(process.stdout_bytes().data()),static_cast<std::streamsize>(process.stdout_bytes().size()));
+    if(!process.stderr_bytes().empty()) std::cerr.write(reinterpret_cast<const char*>(process.stderr_bytes().data()),static_cast<std::streamsize>(process.stderr_bytes().size()));
+    std::cout.flush();
+    if(!std::cout || !std::cerr) return 1;
+    std::cerr << "\nExperimental Linux test ABI: instructions=" << report.attempted << " stop RIP=" << report.stop_rip
+              << "; PS5 software and GTA VI are not supported.\n";
+    if(report.result==nightfall::runtime::ProcessResult::exited) return report.exit_code;
+    std::cerr << "Test program did not exit via supported syscall; result=" << static_cast<int>(report.result) << '\n';
+    return 1;
+}
+
 int inspect(const char* path) {
     const auto info=nightfall::loader::inspect_elf64(path);
     if(info.status!=nightfall::loader::InspectStatus::ok) {
@@ -98,6 +150,19 @@ int inspect(const char* path) {
 }
 int main(int argc,char** argv) {
     if (argc>1) {
+        if (std::string_view(argv[1])=="--run-linux-elf" || std::string_view(argv[1])=="--run-linux-elf-stdin") {
+            if(argc<3 || argc>131) { std::cerr << "Usage: nightfall_cli --run-linux-elf file [budget [arguments...]]\n"; return 2; }
+            std::size_t budget=default_budget;
+            if(argc>=4) {
+                std::string_view value(argv[3]); auto result=std::from_chars(value.data(),value.data()+value.size(),budget);
+                if(value.empty() || result.ec!=std::errc{} || result.ptr!=value.data()+value.size() || !budget || budget>max_budget) {
+                    std::cerr << "Budget must be an integer from 1 to " << max_budget << ".\n"; return 2;
+                }
+            }
+            std::vector<std::string> args{"nightfall-guest"};
+            for(int i=4;i<argc;++i) args.emplace_back(argv[i]);
+            return linux_elf(argv[2],budget,args,std::string_view(argv[1])=="--run-linux-elf-stdin");
+        }
         if (std::string_view(argv[1])=="--inspect-elf") {
             if(argc!=3) { std::cerr << "Usage: nightfall_cli --inspect-elf file\n"; return 2; }
             return inspect(argv[2]);

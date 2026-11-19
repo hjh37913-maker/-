@@ -30,6 +30,8 @@ public:
     bool map(std::uint64_t address, std::size_t count, Permission permissions) { return map_detailed(address,count,permissions)==MapStatus::ok; }
     bool unmap(std::uint64_t address, std::size_t count);
     bool protect(std::uint64_t address, std::size_t count, Permission permissions);
+    // Checks a whole range without mutation. This is not host isolation or synchronization.
+    bool can_access(std::uint64_t address,std::size_t count,Permission permission) const noexcept;
     bool read(std::uint64_t address, std::span<std::uint8_t> out) const;
     bool write(std::uint64_t address, std::span<const std::uint8_t> data);
     bool fetch(std::uint64_t address, std::span<std::uint8_t> out) const;

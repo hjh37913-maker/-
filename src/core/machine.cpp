@@ -10,6 +10,7 @@ RunReport Machine::run_detailed(std::size_t instruction_budget) {
         if (step==StepResult::running) continue;
         report.stop_rip=before;
         if (step==StepResult::halted) { report.result=RunResult::halted; return report; }
+        if (step==StepResult::syscall_trap) { report.result=RunResult::syscall_trap; return report; }
         report.result=step==StepResult::invalid_instruction?RunResult::invalid_instruction:RunResult::memory_fault;
         for (std::size_t n=0;n<report.fault_bytes.size();++n) {
             if (n>std::numeric_limits<std::uint64_t>::max()-before ||

@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 namespace nightfall {
-enum class RunResult { halted, invalid_instruction, memory_fault, budget_exhausted };
+enum class RunResult { halted, syscall_trap, invalid_instruction, memory_fault, budget_exhausted };
 // Diagnostic bytes are execute-accessible bytes at the failing RIP, not a decoded
 // instruction or a guarantee that a memory fault occurred during instruction fetch.
 struct RunReport {

@@ -5,3 +5,10 @@
 `advance_to` rejects backwards time; `advance_by` detects overflow. Both leave state unchanged on time errors. On success, time advances even if budget is zero, and at most the requested number of expired events are removed and returned. `due_remaining` reports whether any event remains due at the new time; it is meaningful only on success. Multiple calls at the same time drain a backlog. The output vector is reserved before the queue/time changes, so allocation failures during reserve propagate with state unchanged. Scheduling can also propagate allocation failures. The caller must serialize all access. Cancel is a linear scan; this is not optimized for large queues. IDs never reset, including when the queue is empty; after exhausting them the queue cannot schedule again.
 
 The 100 deterministic tests use an independent sorted-vector oracle and do not establish PS5 timing semantics. There is a restricted ELF64 test loader (see ELF_LOADER.md), but no PS5 executable loader, process, ABI, syscall, guest timer interface, process scheduler, host timer integration, filesystem or input service. Protected package decryption, console secrets and DRM circumvention remain outside scope. Ownership of software alone does not establish a viable access or execution path.
+
+## Experimental Linux test ABI
+
+A bounded, synthetic Linux x86-64 syscall environment and minimal process
+stack now exercise original static ELF fixtures. This is not a PS5 ABI or a
+security sandbox; see [LINUX_TEST_ABI.md](LINUX_TEST_ABI.md) for behavior,
+limits, test scope, and commands.
