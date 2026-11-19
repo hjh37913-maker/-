@@ -4,7 +4,7 @@ import platform
 import subprocess
 import sys
 
-cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions = sys.argv[1:]
+cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions, strings = sys.argv[1:]
 def guest(file, budget='100', *argv):
     return subprocess.run([cli, '--run-linux-elf', file, budget, *argv], capture_output=True)
 q=guest(hello)
@@ -45,6 +45,14 @@ assert q.returncode==0 and q.stdout==b'Multiply OK\n', (q.returncode,q.stdout,q.
 if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
     native=subprocess.run([multiply],capture_output=True)
     assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+q=guest(strings)
+assert q.returncode==0 and q.stdout==b'String OK\n', (q.returncode,q.stdout,q.stderr)
+if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
+    native=subprocess.run([strings],capture_output=True)
+    assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+# A small budget may stop a repeated instruction before it finishes.
+q=guest(strings,'8')
+assert q.returncode==1 and b'budget_exhausted' in q.stderr and not q.stdout
 q=guest(conditions)
 assert q.returncode==0 and q.stdout==b'Conditions OK\n', (q.returncode,q.stdout,q.stderr)
 if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):

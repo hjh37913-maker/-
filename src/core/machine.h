@@ -18,6 +18,8 @@ class Machine {
 public:
     explicit Machine(std::size_t memory_size) : memory(memory_size) {}
     Machine(std::size_t memory_size, SparsePages sparse) : memory(memory_size,sparse) {}
+    // Budget counts CPU steps. A repeated string instruction uses one step
+    // per element (or one step for a zero-count instruction).
     RunResult run(std::size_t instruction_budget);
     RunReport run_detailed(std::size_t instruction_budget);
     Memory memory;

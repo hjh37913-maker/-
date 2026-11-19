@@ -178,3 +178,29 @@ conditions and all combinations of relevant flags. The arithmetic oracle uses
 equivalent native register operations, not the exact guest addressing or
 immediate encoding. Original Linux ELF fixtures exercise carry and conditional
 instructions. Linux tests do not establish Windows or PS5 runtime support.
+
+## Restartable string instructions
+
+`MOVS`, `STOS`, `LODS`, `CMPS`, and `SCAS` support byte, word, dword and
+qword element sizes with 64-bit RSI/RDI addressing, and `CLD`/`STD` change
+DF. `F3` repeats all five; `F2` repeats CMPS/SCAS until equality (REPNE),
+while F3 on CMPS/SCAS repeats while equal (REPE). Operand-size override and
+REX.W are supported for word/qword non-byte forms, but not mixed; address-size
+override, segments, arbitrary prefix combinations, and F2 MOVS/STOS/LODS are
+not implemented. Comparison updates the arithmetic flags; MOVS/STOS/LODS
+preserve flags. Guest memory permissions are checked before a step commits.
+
+A repeated instruction executes **at most one element per CPU step** and
+leaves RIP pointing at itself until done. Zero count consumes one step without
+memory access. Each element consumes one execution-budget unit, so enormous
+RCX values cannot block the host. On a fault, prior completed iterations
+remain committed; the faulting iteration leaves its registers and flags
+unchanged. This differs from retired-instruction counting. Self-modifying code
+that changes the REP instruction during its execution can be re-decoded on
+resumption; this experimental model is not a complete x86 exception/interrupt
+implementation or a security boundary.
+
+Native x86-64 tests compare 24,576 MOVS/STOS/LODS and 32,768 CMPS/SCAS
+scenarios, including direction, overlap, stop conditions and flags. An original
+Linux ELF exercises a bounded copy and search. These are selected cases, not
+proof of full string-instruction or PS5 compatibility.

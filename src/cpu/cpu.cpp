@@ -226,6 +226,57 @@ StepResult Cpu::step(Memory& memory) {
         ++state.rip;
         return b[0] == 0xf4 ? StepResult::halted : StepResult::running;
     }
+    // CLD/STD modify only the direction flag.
+    if(b[0]==0xfc || b[0]==0xfd) {
+        if(b[0]==0xfc) state.rflags&=~(1ULL<<10); else state.rflags|=1ULL<<10;
+        ++state.rip; return StepResult::running;
+    }
+    // MOVS/STOS/LODS and CMPS/SCAS with optional REP: each step executes at most one
+    // element. RIP remains on REP until completion, so a budget can stop a
+    // long operation and resume it. Faults commit only prior iterations.
+    {
+        unsigned pos=0; const bool rep=b[pos]==0xf3 || b[pos]==0xf2;
+        const auto repeat_prefix=rep?b[pos]:std::uint8_t{0};
+        if(rep) { ++pos; if(!memory.fetch(state.rip,std::span(b).first(pos+1))) return StepResult::memory_fault; }
+        const bool word=b[pos]==0x66;
+        if(word) { ++pos; if(!memory.fetch(state.rip,std::span(b).first(pos+1))) return StepResult::memory_fault; }
+        const bool has_rex=b[pos]>=0x40 && b[pos]<=0x4f; const auto rex=has_rex?b[pos]:std::uint8_t{0};
+        if(has_rex) { ++pos; if(!memory.fetch(state.rip,std::span(b).first(pos+1))) return StepResult::memory_fault; }
+        const auto op=b[pos];
+        const bool mov=op==0xa4||op==0xa5, store=op==0xaa||op==0xab, load=op==0xac||op==0xad;
+        const bool compare=op==0xa6||op==0xa7, scan=op==0xae||op==0xaf;
+        if(mov||store||load||compare||scan) {
+            if(repeat_prefix==0xf2 && !(compare||scan)) return StepResult::invalid_instruction;
+            const bool byte=(op&1)==0;
+            if(word && ((rex&8)||byte)) return StepResult::invalid_instruction;
+            const unsigned width=byte?1:word?2:(rex&8)?8:4;
+            auto& rcx=*state.reg(1); auto& rsi=*state.reg(6); auto& rdi=*state.reg(7);
+            if(rep && !rcx) { state.rip+=pos+1; return StepResult::running; }
+            std::array<std::uint8_t,8> value{};
+            if(mov||load||compare) { if(!memory.read(rsi,std::span(value).first(width))) return StepResult::memory_fault; }
+            else value=bytes64(state.rax);
+            if(compare||scan) {
+                std::array<std::uint8_t,8> second{};
+                if(!memory.read(rdi,std::span(second).first(width))) return StepResult::memory_fault;
+                auto next=state; next.rflags&=~std::uint64_t{1};
+                carry_arithmetic(next,little(value.data(),width),little(second.data(),width),width*8,true);
+                state.rflags=next.rflags;
+            }
+            if(mov||store) { if(!memory.write(rdi,std::span(value).first(width))) return StepResult::memory_fault; }
+            if(load) {
+                const auto result=little(value.data(),width);
+                if(width==8||width==4) state.rax=result;
+                else { const auto mask=width==1?0xffULL:0xffffULL; state.rax=(state.rax&~mask)|result; }
+            }
+            const auto delta=(state.rflags&(1ULL<<10))?std::uint64_t{0}-width:std::uint64_t{width};
+            if(mov||load||compare) rsi+=delta;
+            if(mov||store||compare||scan) rdi+=delta;
+            if(rep) --rcx;
+            const bool stop_comparing=(compare||scan) && rep && (bool(state.rflags&(1ULL<<6))!=(repeat_prefix==0xf3));
+            if(!rep || !rcx || stop_comparing) state.rip+=pos+1;
+            return StepResult::running;
+        }
+    }
     // ADC/SBB register, memory, immediate and accumulator forms.
     // Decode and read all operands before committing memory, registers or flags.
     {

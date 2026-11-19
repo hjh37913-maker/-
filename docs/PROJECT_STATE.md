@@ -17,8 +17,16 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 115 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 118 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current restartable string-instruction batch
+
+Added step-bounded MOVS/STOS/LODS, CMPS/SCAS with REP/REPE/REPNE and
+CLD/STD, native comparisons, partial-fault and budget checks, and an original
+Linux ELF. Linux Debug, Release and ASan+UBSan passed 118/118 tests each;
+Windows x64 cross-compilation only. This is not game or PS5 support. See
+CPU_ARCHITECTURE.md for supported prefixes and restart limitations.
 
 ## Current CPU carry and conditions batch
 

@@ -40,7 +40,9 @@ build-verify-debug/nightfall_cli --run-linux-elf examples/linux-args.elf 100 fir
 printf 'hello' | build-verify-debug/nightfall_cli --run-linux-elf-stdin examples/linux-echo.elf 100
 ```
 
-The first argument after the ELF is an optional instruction budget; subsequent
+The first argument after the ELF is an optional execution-step budget; repeated
+string instructions consume a step per element, including one for a zero count.
+Subsequent
 arguments become guest argv after a synthetic argv[0]. Without the stdin mode,
 guest fd 0 starts empty. The CLI prints captured guest output and a diagnostic
 on host stderr, and returns the guest exit status on modeled exit. Interrupted,

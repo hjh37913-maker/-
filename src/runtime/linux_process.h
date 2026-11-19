@@ -24,6 +24,7 @@ public:
     // Configures an initially unmapped, at-most-1 MiB heap for the modeled brk.
     // Bounds must be 4096-byte aligned and fit the guest virtual capacity.
     bool configure_brk(std::uint64_t base,std::uint64_t limit);
+    // Budget counts CPU steps, including each element of a REP instruction.
     ProcessReport run(std::size_t instruction_budget);
     std::span<const std::uint8_t> stdout_bytes() const noexcept { return stdout_; }
     std::span<const std::uint8_t> stderr_bytes() const noexcept { return stderr_; }

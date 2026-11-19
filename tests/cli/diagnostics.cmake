@@ -6,7 +6,7 @@ execute_process(COMMAND "${NIGHTFALL_CLI}" --run-raw "${SAMPLE}" 10
 if(NOT status EQUAL 1)
   message(FATAL_ERROR "Expected nonzero invalid instruction status: ${status}; ${output}; ${errors}")
 endif()
-foreach(required "invalid_instruction" "Instructions attempted=1 stop RIP=0" "0f 0b")
+foreach(required "invalid_instruction" "Execution steps attempted=1 stop RIP=0" "0f 0b")
   string(FIND "${output}" "${required}" index)
   if(index EQUAL -1)
     message(FATAL_ERROR "Missing diagnostic '${required}': ${output}")

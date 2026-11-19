@@ -30,7 +30,7 @@ const char* name(nightfall::RunResult result) {
     return "unknown";
 }
 void diagnostic(const nightfall::RunReport& report) {
-    std::cout << "Instructions attempted=" << report.attempted << " stop RIP=" << report.stop_rip << '\n';
+    std::cout << "Execution steps attempted=" << report.attempted << " stop RIP=" << report.stop_rip << '\n';
     if (report.result==nightfall::RunResult::memory_fault || report.result==nightfall::RunResult::invalid_instruction || report.result==nightfall::RunResult::divide_error) {
         std::cout << "Bytes accessible at stop RIP (not decoded; memory fault may be data access):";
         if (!report.fault_byte_count) std::cout << " unavailable";
@@ -136,7 +136,7 @@ int linux_elf(const char* path,std::size_t budget,std::span<const std::string> a
     if(!process.stderr_bytes().empty()) std::cerr.write(reinterpret_cast<const char*>(process.stderr_bytes().data()),static_cast<std::streamsize>(process.stderr_bytes().size()));
     std::cout.flush();
     if(!std::cout || !std::cerr) return 1;
-    std::cerr << "\nExperimental Linux test ABI: instructions=" << report.attempted << " stop RIP=" << report.stop_rip
+    std::cerr << "\nExperimental Linux test ABI: steps=" << report.attempted << " stop RIP=" << report.stop_rip
               << "; PS5 software and GTA VI are not supported.\n";
     if(report.result==nightfall::runtime::ProcessResult::exited) return report.exit_code;
     std::cerr << "Test program did not exit via supported syscall; result=" << process_name(report.result) << '\n';
