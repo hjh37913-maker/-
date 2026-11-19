@@ -56,3 +56,10 @@ The C compiler and linker versions or flags may generate different instructions 
 `indirect-call.c` is a freestanding C example using a volatile function pointer, compiled with GCC 12.2 and the flags above. Run `./build/nightfall_cli --run-elf examples/indirect-call.elf 100`; expected RAX=42. Its synthetic HLT must **not** be executed directly on the host.
 
 `unsupported-demo.bin` is original raw bytes `0f 0b`; it demonstrates an unsupported instruction. `./build/nightfall_cli --run-raw examples/unsupported-demo.bin 10` exits with code 1 and prints the stopping RIP and executable bytes. Reported bytes are a bounded memory snapshot, not a decoded instruction; memory faults may originate in data access.
+
+## AND/OR C fixture
+`and-or-demo.c` is an original freestanding C example using 32-bit register
+AND and OR. It was built with GCC 12.2 using the flags above. Run
+`./build/nightfall_cli --run-elf examples/and-or-demo.elf 100`: the interpreter
+should halt with RAX=42. The synthetic HLT is **not safe to execute on the
+host**. This does not test an OS, PS5 runtime or a game.

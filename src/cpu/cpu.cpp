@@ -250,7 +250,7 @@ StepResult Cpu::step(Memory& memory) {
     // Selected unprefixed 32-bit register and memory forms.
     const auto op32=b[0];
     if (op32==0x81 || op32==0x83 || op32==0x85 || op32==0x89 || op32==0x8b || op32==0x8d || op32==0xc7 || op32==0x01 || op32==0x03 ||
-        op32==0x29 || op32==0x2b || op32==0x31 || op32==0x33 || op32==0x39 || op32==0x3b) {
+        op32==0x29 || op32==0x2b || op32==0x31 || op32==0x33 || op32==0x09 || op32==0x0b || op32==0x21 || op32==0x23 || op32==0x39 || op32==0x3b) {
         if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
         const unsigned mod=b[1]>>6, reg=(b[1]>>3)&7, rm=b[1]&7;
         if (mod!=3) {
@@ -272,7 +272,7 @@ StepResult Cpu::step(Memory& memory) {
                 if (op32==0x8b) *state.reg(reg)=value;
                 else if (op32==0x85) logical_test32(state,value & static_cast<std::uint32_t>(*state.reg(reg)));
                 else {
-                    const bool to_reg=op32==0x03 || op32==0x2b || op32==0x33 || op32==0x3b;
+                    const bool to_reg=op32==0x03 || op32==0x2b || op32==0x33 || op32==0x0b || op32==0x23 || op32==0x3b;
                     const bool compare=op32==0x39 || op32==0x3b || ((op32==0x81 || op32==0x83) && reg==7);
                     const bool subtract=op32==0x29 || op32==0x2b || compare || ((op32==0x81 || op32==0x83) && reg==5);
                     const auto rhs=op32==0x81 ? static_cast<std::uint32_t>(little(b.data()+length-4,4)) :
@@ -281,8 +281,11 @@ StepResult Cpu::step(Memory& memory) {
                     // Stage flags and result so a failed write does not change CPU state.
                     auto next=state;
                     std::uint64_t dst=to_reg ? *state.reg(reg) : value;
-                    if (op32==0x31 || op32==0x33) {
-                        dst=static_cast<std::uint32_t>(dst) ^ rhs;
+                    if (op32==0x31 || op32==0x33 || op32==0x09 || op32==0x0b || op32==0x21 || op32==0x23) {
+                        dst=static_cast<std::uint32_t>(dst);
+                        if (op32==0x31 || op32==0x33) dst^=rhs;
+                        else if (op32==0x09 || op32==0x0b) dst|=rhs;
+                        else dst&=rhs;
                         logical_test32(next,static_cast<std::uint32_t>(dst));
                     } else arithmetic32(next,dst,rhs,subtract,compare);
                     if (!to_reg && !compare) {
@@ -313,12 +316,15 @@ StepResult Cpu::step(Memory& memory) {
             logical_test32(state,static_cast<std::uint32_t>(*state.reg(reg)) & static_cast<std::uint32_t>(*state.reg(rm)));
             state.rip+=2; return StepResult::running;
         }
-        const bool to_reg=op32==0x8b || op32==0x03 || op32==0x2b || op32==0x33 || op32==0x3b;
+        const bool to_reg=op32==0x8b || op32==0x03 || op32==0x2b || op32==0x33 || op32==0x0b || op32==0x23 || op32==0x3b;
         auto& dst=*state.reg(to_reg?reg:rm);
         const auto src=static_cast<std::uint32_t>(*state.reg(to_reg?rm:reg));
         if (op32==0x89 || op32==0x8b) dst=src;
-        else if (op32==0x31 || op32==0x33) {
-            dst=static_cast<std::uint32_t>(dst)^src;
+        else if (op32==0x31 || op32==0x33 || op32==0x09 || op32==0x0b || op32==0x21 || op32==0x23) {
+            dst=static_cast<std::uint32_t>(dst);
+            if (op32==0x31 || op32==0x33) dst^=src;
+            else if (op32==0x09 || op32==0x0b) dst|=src;
+            else dst&=src;
             logical_test32(state,static_cast<std::uint32_t>(dst));
         }
         else arithmetic32(state,dst,src,op32==0x29 || op32==0x2b || op32==0x39 || op32==0x3b,
@@ -381,7 +387,7 @@ StepResult Cpu::step(Memory& memory) {
         return StepResult::running;
     }
     if (opcode==0x89 || opcode==0x8b || opcode==0x8d || opcode==0x01 || opcode==0x03 ||
-        opcode==0x29 || opcode==0x2b || opcode==0x31 || opcode==0x33 || opcode==0x39 || opcode==0x3b || opcode==0x85) {
+        opcode==0x29 || opcode==0x2b || opcode==0x31 || opcode==0x33 || opcode==0x09 || opcode==0x0b || opcode==0x21 || opcode==0x23 || opcode==0x39 || opcode==0x3b || opcode==0x85) {
         if (!memory.fetch(state.rip, std::span(b).first(3))) return StepResult::memory_fault;
         const unsigned mod=b[2]>>6;
         const unsigned reg=((b[2]>>3)&7) + ((b[0]&4) ? 8 : 0);
@@ -403,11 +409,16 @@ StepResult Cpu::step(Memory& memory) {
                 if (opcode==0x8b) *state.reg(reg)=value;
                 else if (opcode==0x85) logical_test(state,value & *state.reg(reg));
                 else {
-                    const bool to_reg=opcode==0x03 || opcode==0x2b || opcode==0x33 || opcode==0x3b;
+                    const bool to_reg=opcode==0x03 || opcode==0x2b || opcode==0x33 || opcode==0x0b || opcode==0x23 || opcode==0x3b;
                     const bool compare=opcode==0x39 || opcode==0x3b;
                     const auto rhs=to_reg ? value : *state.reg(reg);
                     auto next=state; auto dst=to_reg ? *state.reg(reg) : value;
-                    if (opcode==0x31 || opcode==0x33) { dst^=rhs; logical_test(next,dst); }
+                    if (opcode==0x31 || opcode==0x33 || opcode==0x09 || opcode==0x0b || opcode==0x21 || opcode==0x23) {
+                        if (opcode==0x31 || opcode==0x33) dst^=rhs;
+                        else if (opcode==0x09 || opcode==0x0b) dst|=rhs;
+                        else dst&=rhs;
+                        logical_test(next,dst);
+                    }
                     else arithmetic(next,dst,rhs,opcode==0x29 || opcode==0x2b || compare,compare);
                     if (!to_reg && !compare && !memory.write(address,bytes64(dst))) return StepResult::memory_fault;
                     if (to_reg && !compare) *next.reg(reg)=dst;
@@ -422,11 +433,16 @@ StepResult Cpu::step(Memory& memory) {
             logical_test(state,*state.reg(reg) & *state.reg(rm));
             state.rip+=3; return StepResult::running;
         }
-        const bool to_reg=opcode==0x8b || opcode==0x03 || opcode==0x2b || opcode==0x33 || opcode==0x3b;
+        const bool to_reg=opcode==0x8b || opcode==0x03 || opcode==0x2b || opcode==0x33 || opcode==0x0b || opcode==0x23 || opcode==0x3b;
         auto& dst=*state.reg(to_reg ? reg : rm);
         const auto src=*state.reg(to_reg ? rm : reg);
         if (opcode==0x89 || opcode==0x8b) dst=src;
-        else if (opcode==0x31 || opcode==0x33) { dst^=src; logical_test(state,dst); }
+        else if (opcode==0x31 || opcode==0x33 || opcode==0x09 || opcode==0x0b || opcode==0x21 || opcode==0x23) {
+            if (opcode==0x31 || opcode==0x33) dst^=src;
+            else if (opcode==0x09 || opcode==0x0b) dst|=src;
+            else dst&=src;
+            logical_test(state,dst);
+        }
         else arithmetic(state,dst,src,opcode==0x29 || opcode==0x2b || opcode==0x39 || opcode==0x3b,
                         opcode==0x39 || opcode==0x3b);
         state.rip += 3;

@@ -16,3 +16,14 @@ immediates, register/flag behavior, truncated instructions and stack faults.
 These are generic instruction semantics for original test programs, not a PS5
 ABI, game loader, graphics implementation, or evidence of game compatibility.
 No native CPU differential test for these new instructions was performed.
+
+### Logical operations experiment (2026-11-19)
+Added unprefixed 32-bit and REX.W 64-bit register/memory AND and OR forms
+(opcodes 09/0b/21/23). Immediate forms and non-REX.W extended 32-bit registers
+are not implemented. AF is undefined by the ISA and preserved by this model.
+On Linux x86-64, 36,864 register and memory results and defined flags were
+compared against native CPU execution, alongside portable checks and faults.
+The first regression run exposed a stale unsupported-opcode test; it now
+checks a still-unsupported opcode and separately checks a truncated AND.
+This generic instruction support does not implement the PS5 runtime or make
+any game compatible.

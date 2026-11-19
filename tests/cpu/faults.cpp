@@ -17,12 +17,17 @@ int main() {
         Memory m(code.size()); if (!m.write(0, code)) return false;
         Cpu c; return c.step(m) == StepResult::running && c.state.rip == code.size();
     };
-    { Memory m(2); constexpr std::array<std::uint8_t,2> unsupported{0x48,0x21};
+    { Memory m(2); constexpr std::array<std::uint8_t,2> unsupported{0x48,0x11};
       if (!m.write(0,unsupported)) return 1;
       Cpu c; c.state.rax=42; c.state.rflags=0x402;
       if (c.step(m)!=StepResult::invalid_instruction || c.state.rip!=0 || c.state.rax!=42 || c.state.rflags!=0x402) {
           std::cerr << "Unsupported REX opcode did not stop cleanly\n"; return 1;
       }
+    }
+    { Memory m(2); constexpr std::array<std::uint8_t,2> truncated_and{0x48,0x21};
+      if (!m.write(0,truncated_and)) return 1;
+      Cpu c; c.state.rax=42; c.state.rflags=0x402;
+      if (c.step(m)!=StepResult::memory_fault || c.state.rip!=0 || c.state.rax!=42 || c.state.rflags!=0x402) return 1;
     }
     { Memory m(2); constexpr std::array<std::uint8_t,2> truncated_indirect{0x48,0xff};
       if (!m.write(0,truncated_indirect)) return 1;
