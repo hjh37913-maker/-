@@ -40,3 +40,5 @@
 2026-11-19 continuation: Implemented selected REX.W memory arithmetic/TEST/XOR, imm8 memory arithmetic, and MOV sign-extended imm32. State and flags are staged before guest-memory writes; this is not a host-atomic RMW or a model of LOCK. Memory immediate cases were cross-checked with interpreter register forms, not independent native execution.
 
 2026-11-19 continuation: Added group-1 imm32 ADD/SUB/CMP in selected 32- and 64-bit register/memory forms. The 64-bit immediate is sign-extended. Memory writes remain staged and are not host-atomic. The 24,576-case oracle uses equivalent native register arithmetic, not hardware execution of identical guest bytes.
+
+2026-11-19 continuation: Added near indirect CALL/JMP and PUSH for guest registers and memory as a foundation for compiled code using function pointers. Operand is read before stack updates; target instruction fetch happens at the next step. The model omits canonical-address checks and architectural exceptions. Added bounded diagnostics that report execute-accessible bytes only, without claiming a decode or identifying the faulting data address.

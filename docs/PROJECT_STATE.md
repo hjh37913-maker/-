@@ -16,7 +16,7 @@
 | GPU, shader translation | NOT_IMPLEMENTED | No compatibility implementation |
 | UI / performance telemetry | NOT_IMPLEMENTED | CLI reports synthetic result only |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows untested |
-| Coverage | Measured, limited | 46 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
+| Coverage | Measured, limited | 50 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
 ## Continuation priorities
@@ -81,5 +81,8 @@ Implemented unprefixed 32-bit XOR register and memory forms, and REX.W 64-bit re
 ## Previous 64-bit memory arithmetic batch
 Implemented selected REX.W 64-bit ADD/SUB/CMP/XOR/TEST register-memory forms, sign-extended imm8 ADD/SUB/CMP and sign-extended imm32 MOV to memory/register. The original C fixture uses explicit inline assembly and halts with RAX=42. A native Linux x86-64 oracle passed 36,864 memory register-operand cases; 768 memory-immediate cases compare to the existing interpreter register form, not native. Permission, truncated-instruction, alias, extended-register and fault checks also passed. All 43 CTest cases passed on Linux in Debug, Release and ASan/UBSan. Windows and PS5/GTA VI remain untested.
 
-## Current 5k+ scenario batch: imm32 group 1
+## Previous 5k+ scenario batch: imm32 group 1
 Implemented `81 /0,/5,/7` ADD/SUB/CMP with imm32 for unprefixed 32-bit and REX.W 64-bit register and memory forms, including 64-bit sign extension. 24,576 native-arithmetic comparisons cover these forms and varied operands; the native oracle uses equivalent register arithmetic rather than the same immediate instruction encoding. Portable tests cover permissions, truncated instructions, unsupported groups and RIP-relative addressing. An original GCC C fixture with explicit inline assembly halted at RAX=42. The new test initially had a temporary-array `span` compile error, corrected before verification. All 46 CTest tests passed in Linux Debug, Release and combined ASan/UBSan. Windows, PS5 and GTA VI remain untested. Scenario count is not a count of independent subsystems.
+
+## Current execution foundation batch
+Implemented x86-64 near indirect CALL/JMP and PUSH from register or memory, which enables an original freestanding C function-pointer fixture to halt with RAX=42. Added bounded machine/CLI diagnostics with attempted count, stop RIP and execute-accessible bytes for faults. 6,144 portable register scenarios plus memory, address and fault tests cover indirect operations; these are not native differential tests. All 50 CTest tests passed in Linux Debug, Release and ASan/UBSan. Original fixture is not a game or PS5 executable. No OS ABI, console loader, GPU, Windows validation or game launch exists.

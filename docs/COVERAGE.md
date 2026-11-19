@@ -4,9 +4,9 @@ One GCC 12.2.0 Linux x86-64 Debug `--coverage -O0` build; counters cleared befor
 
 | Source | Executed / instrumented lines | Taken / instrumented branches |
 |---|---:|---:|
-| CPU | 319 / 319 | 627 / 685 |
+| CPU | 343 / 343 | 674 / 737 |
 | ELF loader | 45 / 54 | 92 / 119 |
-| Core machine | 8 / 8 | 6 / 7 |
+| Core machine | 18 / 18 | 17 / 20 |
 | Memory | 49 / 49 | 59 / 70 |
 | Storage | 28 / 31 | 36 / 55 |
 | Input | 27 / 27 | 36 / 48 |

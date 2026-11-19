@@ -1,12 +1,24 @@
 #pragma once
 #include "cpu/cpu.h"
+#include <array>
 #include <cstddef>
+#include <cstdint>
 namespace nightfall {
 enum class RunResult { halted, invalid_instruction, memory_fault, budget_exhausted };
+// Diagnostic bytes are execute-accessible bytes at the failing RIP, not a decoded
+// instruction or a guarantee that a memory fault occurred during instruction fetch.
+struct RunReport {
+    RunResult result=RunResult::budget_exhausted;
+    std::size_t attempted=0;
+    std::uint64_t stop_rip=0;
+    std::array<std::uint8_t,15> fault_bytes{};
+    std::size_t fault_byte_count=0;
+};
 class Machine {
 public:
     explicit Machine(std::size_t memory_size) : memory(memory_size) {}
     RunResult run(std::size_t instruction_budget);
+    RunReport run_detailed(std::size_t instruction_budget);
     Memory memory;
     Cpu cpu;
 };

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <iomanip>
 #include <string_view>
 #include <system_error>
 namespace {
@@ -18,6 +19,16 @@ const char* name(nightfall::RunResult result) {
     case nightfall::RunResult::budget_exhausted: return "budget_exhausted";
     }
     return "unknown";
+}
+void diagnostic(const nightfall::RunReport& report) {
+    std::cout << "Instructions attempted=" << report.attempted << " stop RIP=" << report.stop_rip << '\n';
+    if (report.result==nightfall::RunResult::memory_fault || report.result==nightfall::RunResult::invalid_instruction) {
+        std::cout << "Bytes accessible at stop RIP (not decoded; memory fault may be data access):";
+        if (!report.fault_byte_count) std::cout << " unavailable";
+        for (std::size_t i=0;i<report.fault_byte_count;++i)
+            std::cout << ' ' << std::hex << std::setw(2) << std::setfill('0') << unsigned(report.fault_bytes[i]);
+        std::cout << std::dec << std::setfill(' ') << '\n';
+    }
 }
 int raw(const char* path,std::size_t budget) {
     std::error_code ec;
@@ -35,9 +46,11 @@ int raw(const char* path,std::size_t budget) {
     }
     // Synthetic raw programs start with an empty stack at the end of memory.
     *machine.cpu.state.reg(4)=capacity;
-    const auto result=machine.run(budget);
+    const auto report=machine.run_detailed(budget);
+    const auto result=report.result;
     std::cout << "Experimental raw test program: " << name(result) << " RAX=" << machine.cpu.state.rax
               << " RIP=" << machine.cpu.state.rip << "\nPS5 software and GTA VI are not supported.\n";
+    diagnostic(report);
     return result==nightfall::RunResult::halted?0:1;
 }
 int elf(const char* path,std::size_t budget) {
@@ -51,9 +64,11 @@ int elf(const char* path,std::size_t budget) {
     if (status!=nightfall::loader::ElfStatus::ok) {
         std::cerr << "Test ELF rejected: " << nightfall::loader::elf_status_name(status) << '\n'; return 1;
     }
-    auto result=machine.run(budget);
+    auto report=machine.run_detailed(budget);
+    auto result=report.result;
     std::cout << "Experimental ELF64 test program: " << name(result) << " RAX=" << machine.cpu.state.rax
               << " RIP=" << machine.cpu.state.rip << "\nPS5 software and GTA VI are not supported.\n";
+    diagnostic(report);
     return result==nightfall::RunResult::halted?0:1;
 }
 

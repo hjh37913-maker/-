@@ -115,6 +115,37 @@ StepResult Cpu::step(Memory& memory) {
         ++state.rip;
         return b[0] == 0xf4 ? StepResult::halted : StepResult::running;
     }
+    // Near indirect CALL/JMP and PUSH r/m64 (FF /2, /4, /6).
+    // Evaluate memory/register operands before changing RSP, including [rsp].
+    const bool rex_indirect=b[0]>=0x40 && b[0]<=0x4f;
+    if (b[0]==0xff || rex_indirect) {
+        const unsigned op_pos=rex_indirect?1:0;
+        if (!memory.fetch(state.rip,std::span(b).first(op_pos+1))) return StepResult::memory_fault;
+        if (b[op_pos]==0xff) {
+            const unsigned modrm_pos=op_pos+1;
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned mod=b[modrm_pos]>>6, extension=(b[modrm_pos]>>3)&7;
+            if (extension!=2 && extension!=4 && extension!=6) return StepResult::invalid_instruction;
+            const std::uint8_t rex=rex_indirect?b[0]:0;
+            unsigned length=modrm_pos+1; std::uint64_t operand=0;
+            if (mod==3) operand=*state.reg((b[modrm_pos]&7)+((rex&1)?8:0));
+            else {
+                std::uint64_t address=0;
+                if (!effective_address(memory,state,b,modrm_pos,rex,0,address,length)) return StepResult::memory_fault;
+                std::array<std::uint8_t,8> data{};
+                if (!memory.read(address,data)) return StepResult::memory_fault;
+                operand=little(data.data(),8);
+            }
+            if (extension==2 || extension==6) {
+                auto& rsp=*state.reg(4); const auto next_rsp=rsp-8;
+                const auto value=extension==2 ? state.rip+length : operand;
+                if (!memory.write(next_rsp,bytes64(value))) return StepResult::memory_fault;
+                rsp=next_rsp;
+            }
+            state.rip=extension==6 ? state.rip+length : operand;
+            return StepResult::running;
+        }
+    }
     // MOV r32, imm32 zero-extends into the corresponding 64-bit register.
     if (b[0]>=0xb8 && b[0]<=0xbf) {
         if (!memory.fetch(state.rip,std::span(b).first(5))) return StepResult::memory_fault;
