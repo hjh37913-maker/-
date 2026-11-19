@@ -1,0 +1,10 @@
+{
+  "binary_sha256": "f7fcfd131c70d8505398062d8496a600b224ef57dc16bf049ecb3b61fd5e9f09",
+  "seed_start": 712846,
+  "batches": 7133,
+  "comparisons_per_batch": 5000,
+  "total_comparisons": 35665000,
+  "elapsed_seconds": 2100.364,
+  "finished_utc": "2026-11-19T18:25:10.481144+00:00",
+  "oracle_output": "5000 deterministic mutated ELF loader rollback/invariant cases passed"
+}
