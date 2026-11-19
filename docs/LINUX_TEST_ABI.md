@@ -17,7 +17,7 @@ stdin mode, reads host standard input.
   `AT_NULL` only; it is not a complete Linux auxiliary vector. Arguments are
   bounded, and the initial stack pointer is aligned to 16 bytes.
 * Syscalls: buffered `read`/`readv` and `write`/`writev`; `open`, `openat`,
-  `close`, `lseek`, `pread64` and selected stat calls for opt-in immutable
+  `close`, `dup`/`dup2`/`dup3`, `lseek`, `pread64` and selected stat calls for opt-in immutable
   in-memory fixtures;
   a bounded page-mapped synthetic `brk`, a constrained anonymous
   `mmap`/`mprotect`/`munmap` arena, and `exit`/`exit_group`.
@@ -38,7 +38,10 @@ stdin mode, reads host standard input.
   path traversal or symlink resolution is performed. Open supports read-only
   mode and optional `O_CLOEXEC`, `openat` only supports `AT_FDCWD`, and there
   are 19 modeled descriptor slots (including standard streams). Closing a
-  descriptor permits its reuse. The model's errors, resource limits and
+  descriptor permits its reuse. Duplicated descriptors share the same modeled
+  open-file offset; independent opens have independent offsets. Duplication
+  can also redirect the captured standard streams; `O_CLOEXEC` is accepted but
+  no exec is modeled. The model's errors, resource limits and
   `readv` atomic fault behavior differ from Linux; there is no file write,
   directory API, host filesystem or process exec. `stat`, `lstat`, `fstat`
   and `newfstatat` use a 144-byte x86-64 Linux layout for registered files,
@@ -84,6 +87,9 @@ x86-64, private-pipe comparisons exercise 8,192 generated cases per basic
 read, write, readv and writev oracle. A separate native private-memfd test
 compares 25,600 stateful file read/pread/lseek/readv operations and 256 file
 size/type checks for fstat; inode, permissions and timestamps are synthetic.
+A further 32,768 stateful operations compare open/dup/dup2/close/read/seek
+against Linux private memfds; test descriptor numbers are mapped to private
+host descriptors and do not involve guest paths.
 Original
 Linux ELF examples are compared
 with native output and exit where applicable. These are finite test cases, not

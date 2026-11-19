@@ -55,11 +55,16 @@ bool LinuxProcess::add_test_file(std::string path,std::span<const std::uint8_t> 
         files_.push_back(std::move(file)); file_bytes_+=bytes.size(); return true;
     } catch(const std::bad_alloc&) { return false; } catch(const std::length_error&) { return false; }
 }
+void LinuxProcess::close_descriptor(std::size_t fd) noexcept {
+    auto& desc=descriptors_[fd];
+    if(desc.kind==FdKind::file) --open_files_[desc.description].references;
+    desc={};
+}
 LinuxProcess::ReadSource LinuxProcess::read_source(std::uint32_t fd) noexcept {
     if(fd>=descriptors_.size()) return {};
     auto& desc=descriptors_[fd];
     if(desc.kind==FdKind::input) return {&stdin_,&stdin_cursor_};
-    if(desc.kind==FdKind::file) return {&files_[desc.file_index].bytes,&desc.cursor};
+    if(desc.kind==FdKind::file) { auto& open=open_files_[desc.description]; return {&files_[open.file_index].bytes,&open.cursor}; }
     return {};
 }
 bool LinuxProcess::set_stdin(std::span<const std::uint8_t> bytes) {
@@ -119,12 +124,32 @@ void LinuxProcess::dispatch() {
         if(error) { state.rax=err(error); return; }
         std::size_t fd=0; while(fd<descriptors_.size() && descriptors_[fd].kind!=FdKind::unused) ++fd;
         if(fd==descriptors_.size()) { state.rax=err(24); return; }
-        descriptors_[fd]={FdKind::file,file,0}; state.rax=fd; return;
+        std::size_t slot=0; while(slot<open_files_.size() && open_files_[slot].references) ++slot;
+        if(slot==open_files_.size()) { state.rax=err(24); return; }
+        open_files_[slot]={file,1,0}; descriptors_[fd]={FdKind::file,slot}; state.rax=fd; return;
     }
     if(number==3) { // close any modeled descriptor; no host descriptor exists.
         const auto fd=static_cast<std::uint32_t>(arg0);
         if(fd>=descriptors_.size() || descriptors_[fd].kind==FdKind::unused) { state.rax=err(9); return; }
-        descriptors_[fd]={}; state.rax=0; return;
+        close_descriptor(fd); state.rax=0; return;
+    }
+    if(number==32 || number==33 || number==292) { // dup/dup2/dup3, bounded virtual descriptors
+        const auto oldfd=static_cast<std::uint32_t>(arg0);
+        if(oldfd>=descriptors_.size() || descriptors_[oldfd].kind==FdKind::unused) { state.rax=err(9); return; }
+        std::size_t target=0;
+        if(number==32) {
+            while(target<descriptors_.size() && descriptors_[target].kind!=FdKind::unused) ++target;
+            if(target==descriptors_.size()) { state.rax=err(24); return; }
+        } else {
+            target=static_cast<std::uint32_t>(arg1);
+            if(target>=descriptors_.size()) { state.rax=err(9); return; }
+            if(number==292 && (static_cast<std::uint32_t>(arg2) & ~0x80000U)) { state.rax=err(22); return; }
+            if(oldfd==target) { state.rax=number==292?err(22):target; return; }
+            close_descriptor(target);
+        }
+        descriptors_[target]=descriptors_[oldfd];
+        if(descriptors_[target].kind==FdKind::file) ++open_files_[descriptors_[target].description].references;
+        state.rax=target; return;
     }
     if(number==4 || number==5 || number==6 || number==262) { // synthetic x86-64 stat
         std::size_t index=0; std::uint64_t destination=arg1;
@@ -132,7 +157,7 @@ void LinuxProcess::dispatch() {
             const auto fd=static_cast<std::uint32_t>(arg0);
             if(fd>=descriptors_.size() || descriptors_[fd].kind==FdKind::unused) { state.rax=err(9); return; }
             if(descriptors_[fd].kind!=FdKind::file) { state.rax=err(38); return; }
-            index=descriptors_[fd].file_index;
+            index=open_files_[descriptors_[fd].description].file_index;
         } else {
             auto path=arg0;
             if(number==262) {
@@ -150,12 +175,13 @@ void LinuxProcess::dispatch() {
         if(fd>=descriptors_.size() || descriptors_[fd].kind==FdKind::unused) { state.rax=err(9); return; }
         auto& desc=descriptors_[fd]; if(desc.kind!=FdKind::file) { state.rax=err(29); return; }
         if(whence>2) { state.rax=err(22); return; }
-        const std::uint64_t origin=whence==0?0:whence==1?desc.cursor:files_[desc.file_index].bytes.size();
+        auto& open=open_files_[desc.description];
+        const std::uint64_t origin=whence==0?0:whence==1?open.cursor:files_[open.file_index].bytes.size();
         constexpr auto max_offset=std::uint64_t{0x7fffffffffffffffULL};
         std::uint64_t target=0;
         if(arg1>>63) { const auto magnitude=~arg1+1; if(magnitude>origin) { state.rax=err(22); return; } target=origin-magnitude; }
         else { if(arg1>max_offset-origin) { state.rax=err(22); return; } target=origin+arg1; }
-        desc.cursor=target; state.rax=target; return;
+        open.cursor=target; state.rax=target; return;
     }
     if(number==9 || number==10 || number==11) { // bounded anonymous mmap/mprotect/munmap subset
         if(!mmap_configured_) { state.rax=err(38); return; }

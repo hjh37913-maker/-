@@ -257,3 +257,15 @@ Repeated decoder checks share execute-validated instruction bytes within one
 therefore re-fetch and recheck permissions. Tests modify instructions and
 permissions between steps. The memory model does not support concurrent guest
 mapping modifications or provide a sandbox.
+
+## Bit scanning
+`0f bc/bd` BSF/BSR support 16-, 32-, and 64-bit register and memory
+sources, including REX register extensions and existing effective-address
+forms. ZF is set for zero input; in that case the architecturally undefined
+destination is preserved in this implementation. Other undefined flags are
+preserved. Nonzero 32-bit destinations zero-extend, while 16-bit destinations
+preserve upper bits. Read/fetch faults leave state unchanged. The model does not
+implement TZCNT/LZCNT feature-dependent prefix interpretations. Portable tests
+cover single bits, extended addressing and faults; on Linux x86-64 196,608
+register comparisons check the native defined destination (nonzero only) and
+ZF, not undefined flags or native guest addressing.

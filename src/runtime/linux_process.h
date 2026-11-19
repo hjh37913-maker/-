@@ -39,8 +39,10 @@ public:
 private:
     enum class FdKind { unused, input, output, error, file };
     struct TestFile { std::string path; std::vector<std::uint8_t> bytes; };
-    struct Descriptor { FdKind kind=FdKind::unused; std::size_t file_index=0; std::uint64_t cursor=0; };
+    struct Descriptor { FdKind kind=FdKind::unused; std::size_t description=0; };
+    struct OpenFile { std::size_t file_index=0, references=0; std::uint64_t cursor=0; };
     struct ReadSource { const std::vector<std::uint8_t>* bytes=nullptr; std::uint64_t* cursor=nullptr; };
+    void close_descriptor(std::size_t fd) noexcept;
     ReadSource read_source(std::uint32_t fd) noexcept;
     unsigned lookup_test_file(std::uint64_t guest_path,std::size_t& index);
     bool write_test_stat(std::size_t index,std::uint64_t guest_address);
@@ -52,6 +54,7 @@ private:
     std::vector<TestFile> files_;
     std::size_t file_bytes_=0;
     std::array<Descriptor,19> descriptors_{};
+    std::array<OpenFile,19> open_files_{};
     std::uint64_t brk_base_=0, brk_limit_=0, brk_current_=0, brk_mapped_end_=0;
     std::uint64_t mmap_base_=0,mmap_limit_=0;
     std::array<bool,1024> mmap_pages_{};

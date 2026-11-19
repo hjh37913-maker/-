@@ -482,6 +482,46 @@ StepResult Cpu::step(Memory& memory) {
             }
         }
     }
+    // BSF/BSR r16/32/64, r/m: only ZF is architecturally defined.
+    // Preserve other flags; preserve the full destination on zero source
+    // (the architectural destination is undefined in that case).
+    {
+        unsigned pos=0; const bool word=b[0]==0x66;
+        if(word) { ++pos; if(!fetch(pos+1)) return StepResult::memory_fault; }
+        const bool has_rex=b[pos]>=0x40 && b[pos]<=0x4f;
+        const auto rex=has_rex?b[pos]:std::uint8_t{0};
+        if(has_rex) { ++pos; if(!fetch(pos+1)) return StepResult::memory_fault; }
+        if(b[pos]==0x0f) {
+            if(!fetch(pos+2)) return StepResult::memory_fault;
+            const auto op=b[pos+1];
+            if(op==0xbc || op==0xbd) {
+                if(word && (rex&8)) return StepResult::invalid_instruction;
+                const unsigned modpos=pos+2;
+                if(!fetch(modpos+1)) return StepResult::memory_fault;
+                const unsigned mod=b[modpos]>>6, rm=(b[modpos]&7)+((rex&1)?8:0);
+                const unsigned reg=((b[modpos]>>3)&7)+((rex&4)?8:0);
+                const unsigned width=word?16:(rex&8)?64:32;
+                unsigned length=modpos+1; std::uint64_t value=0;
+                if(mod==3) value=*state.reg(rm);
+                else {
+                    std::uint64_t address=0;
+                    if(!effective_address(memory,state,b,modpos,rex,0,address,length)) return StepResult::memory_fault;
+                    std::array<std::uint8_t,8> data{};
+                    if(!memory.read(address,std::span(data).first(width/8))) return StepResult::memory_fault;
+                    value=little(data.data(),width/8);
+                }
+                if(width==16) value&=0xffff; else if(width==32) value&=0xffffffffULL;
+                if(!value) state.rflags|=1ULL<<6;
+                else {
+                    state.rflags&=~(1ULL<<6);
+                    const std::uint64_t bit=op==0xbc?std::countr_zero(value):63-std::countl_zero(value);
+                    auto& target=*state.reg(reg);
+                    target=width==16?(target&~0xffffULL)|bit:bit;
+                }
+                state.rip+=length; return StepResult::running;
+            }
+        }
+    }
     // BSWAP r32/r64 (0F C8..CF); REX.B extends the encoded register.
     if (b[0]==0x0f || (b[0]>=0x40 && b[0]<=0x4f)) {
         const bool has_rex=b[0]!=0x0f;
