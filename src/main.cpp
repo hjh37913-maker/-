@@ -180,6 +180,10 @@ int inspect_sce(const char* path) {
     for(const auto& item:report.imports)
         std::cout << "symbol[" << item.symbol_index << "] binding=" << unsigned(item.binding) << " type=" << unsigned(item.type)
                   << " name=" << escaped_symbol(item.encoded_name) << '\n';
+    std::cout << "OS-tagged RELA entries=" << report.relocations.size() << '\n';
+    for(const auto& item:report.relocations)
+        std::cout << (item.plt?"plt":"rela") << " type=" << item.type << " symbol=" << item.symbol_index
+                  << " target=0x" << std::hex << item.target << " addend=0x" << item.addend << std::dec << '\n';
     return 0;
 }
 

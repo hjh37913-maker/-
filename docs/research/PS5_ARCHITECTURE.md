@@ -83,8 +83,11 @@ actual PS5 executable or game was available for verification.
 
 The inspector reads bounded program headers, a bounded dynamic table, the
 OS-specific symbol/string tables relative to the declared metadata segment,
-and lists encoded names of undefined global/weak symbols. It neither decodes
-NIDs/module qualifiers nor resolves them. Names are escaped in CLI output. It
+and lists encoded names of undefined global/weak symbols. When present,
+OS-tagged RELA and PLT-RELA records are reported as raw relocation type,
+symbol index, target and addend; table sizes and indices are bounded. The
+records are never applied. The inspector neither decodes NIDs/module
+qualifiers nor resolves them. Names are escaped in CLI output. It
 rejects non-ELF input outright and never parses SELF or other protected
 containers, decrypts data, loads segments, or runs code. It is not a PS5
 loader, compatibility verdict, security boundary, or indication GTA VI runs.

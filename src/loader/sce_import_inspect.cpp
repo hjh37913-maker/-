@@ -35,15 +35,22 @@ SceImportReport inspect_sce_imports(const std::filesystem::path& path){
  if(!have_dyn||!have_data){out.status=SceInspectStatus::unsupported;return out;}
  if(!dynlen||dynlen%16){out.status=SceInspectStatus::malformed;return out;}if(dynlen>16384){out.status=SceInspectStatus::resource_limit;return out;}
  auto dynamic=storage::read_range(path,dynoff,static_cast<std::size_t>(dynlen),16384);if(dynamic.status!=storage::ReadStatus::ok)return out;
- bool ended=false,hs=false,hl=false,hy=false,he=false,hz=false;std::uint64_t st=0,sl=0,sy=0,se=0,ss=0;
+ bool ended=false,hs=false,hl=false,hy=false,he=false,hz=false;
+ bool hr=false,hrsz=false,hrent=false,hj=false,hjsz=false,hjtype=false;
+ std::uint64_t st=0,sl=0,sy=0,se=0,ss=0,rt=0,rs=0,re=0,jt=0,js=0,jtype=0;
  for(std::size_t p=0;p<dynlen;p+=16){const auto tag=le(dynamic.bytes,p,8),v=le(dynamic.bytes,p+8,8);if(!tag){ended=true;break;}
   bool* flag=nullptr;std::uint64_t* target=nullptr;
-  switch(tag){case 0x61000035:flag=&hs;target=&st;break;case 0x61000037:flag=&hl;target=&sl;break;case 0x61000039:flag=&hy;target=&sy;break;case 0x6100003b:flag=&he;target=&se;break;case 0x6100003f:flag=&hz;target=&ss;break;default:break;}
+  switch(tag){case 0x61000035:flag=&hs;target=&st;break;case 0x61000037:flag=&hl;target=&sl;break;case 0x61000039:flag=&hy;target=&sy;break;case 0x6100003b:flag=&he;target=&se;break;case 0x6100003f:flag=&hz;target=&ss;break;
+  case 0x6100002f:flag=&hr;target=&rt;break;case 0x61000031:flag=&hrsz;target=&rs;break;case 0x61000033:flag=&hrent;target=&re;break;
+  case 0x61000029:flag=&hj;target=&jt;break;case 0x6100002d:flag=&hjsz;target=&js;break;case 0x6100002b:flag=&hjtype;target=&jtype;break;default:break;}
   if(flag){if(*flag){out.status=SceInspectStatus::malformed;return out;}*flag=true;*target=v;}
  }
  if(!ended){out.status=SceInspectStatus::malformed;return out;}if(!hs||!hl||!hy||!he||!hz){out.status=SceInspectStatus::unsupported;return out;}
  if(se!=24||ss%24||!sl||!fits(st,sl,datalen)||!fits(sy,ss,datalen)){out.status=SceInspectStatus::malformed;return out;}
  if(sl>65536||ss>4096*24){out.status=SceInspectStatus::resource_limit;return out;}
+ if(hr!=hrsz||hr!=hrent||hj!=hjsz||hj!=hjtype||(hr&&(re!=24||rs%24))||(hj&&(jtype!=7||js%24))){out.status=SceInspectStatus::malformed;return out;}
+ if((hr&&!fits(rt,rs,datalen))||(hj&&!fits(jt,js,datalen))){out.status=SceInspectStatus::malformed;return out;}
+ if(rs>4096*24||js>4096*24){out.status=SceInspectStatus::resource_limit;return out;}
  auto strings=storage::read_range(path,dataoff+st,static_cast<std::size_t>(sl),65536);
  auto symbols=storage::read_range(path,dataoff+sy,static_cast<std::size_t>(ss),4096*24);
  if(strings.status!=storage::ReadStatus::ok||symbols.status!=storage::ReadStatus::ok)return out;
@@ -54,6 +61,18 @@ SceImportReport inspect_sce_imports(const std::filesystem::path& path){
   if(e==name||e==sl||e-name>255){out.imports.clear();out.status=SceInspectStatus::malformed;return out;}
   out.imports.push_back({std::string(reinterpret_cast<const char*>(strings.bytes.data()+name),e-name),static_cast<std::uint32_t>(i),static_cast<std::uint8_t>(binding),static_cast<std::uint8_t>(info&15)});
  }
+ auto parse_relocations=[&](std::uint64_t offset,std::uint64_t length,bool plt){
+  if(!length)return SceInspectStatus::ok;
+  const auto table=storage::read_range(path,dataoff+offset,static_cast<std::size_t>(length),4096*24);
+  if(table.status!=storage::ReadStatus::ok)return SceInspectStatus::read_error;
+  for(std::size_t p=0;p<length;p+=24){const auto info=le(table.bytes,p+8,8);const auto index=info>>32;
+   if(index>=ss/24)return SceInspectStatus::malformed;
+   out.relocations.push_back({le(table.bytes,p,8),le(table.bytes,p+16,8),static_cast<std::uint32_t>(index),static_cast<std::uint32_t>(info),plt});
+  }
+  return SceInspectStatus::ok;
+ };
+ if(hr){const auto status=parse_relocations(rt,rs,false);if(status!=SceInspectStatus::ok){out.imports.clear();out.relocations.clear();out.status=status;return out;}}
+ if(hj){const auto status=parse_relocations(jt,js,true);if(status!=SceInspectStatus::ok){out.imports.clear();out.relocations.clear();out.status=status;return out;}}
  out.status=SceInspectStatus::ok;return out;
 }
 }

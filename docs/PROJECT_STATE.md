@@ -20,6 +20,14 @@
 | Coverage | Measured, limited | 148 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
+## Current candidate relocation metadata inspection
+
+For candidate raw SCE-style ELF files, the passive inspector also displays
+bounded OS-tagged RELA/PLT-RELA records with checked symbol indices. No record
+is applied and no game code runs. It has only synthetic fixtures, not a PS5
+sample or validation against a console. Linux Debug, Release and ASan+UBSan
+passed 148/148 each; Windows x64 cross-compiled, not run.
+
 ## Current candidate SCE-style import inspection
 
 Added passive bounded metadata inspection for unprotected raw ELF headers and
