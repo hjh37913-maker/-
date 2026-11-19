@@ -17,8 +17,15 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 118 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 120 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current REX32 and compiled ELF batch
+
+Added selected REX-prefixed 32-bit instructions, multi-byte NOP decoding,
+and an original GCC-compiled freestanding Linux hash test. 120/120 tests passed
+in Linux Debug, Release and ASan+UBSan; Windows x64 cross-compiled only. The
+hash fixture is not a game, crypto implementation or PS5 compatibility test.
 
 ## Current restartable string-instruction batch
 

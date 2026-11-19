@@ -204,3 +204,23 @@ Native x86-64 tests compare 24,576 MOVS/STOS/LODS and 32,768 CMPS/SCAS
 scenarios, including direction, overlap, stop conditions and flags. An original
 Linux ELF exercises a bounded copy and search. These are selected cases, not
 proof of full string-instruction or PS5 compatibility.
+
+## REX-prefixed 32-bit forms and multi-byte NOP
+
+Selected previously unprefixed 32-bit MOV, LEA, arithmetic, logic, TEST and
+immediate-group forms now also accept REX prefixes with W=0. REX.R/B extend
+register operands and REX.X/B extend effective address components; register
+writes zero-extend. Compare and TEST retain their input registers. Faulting
+memory RMW operations stage flags and destination values before write.
+`0F 1F /0` multi-byte NOP accepts one optional `66` and one optional REX,
+decodes ModRM/SIB/displacements but does not read the computed data address.
+Other prefix combinations and unsupported instruction forms are not implied.
+
+Linux native tests compare 114,688 selected R8D/R9D arithmetic operations;
+30,720 portable cases compare prefixed and unprefixed register semantics
+against each other, not an independent oracle. Separate tests cover extended
+SIB addressing, invalid/truncated NOPs and faulting memory. An original GCC
+12.2 `-O2 -nostdlib -static` Linux ELF computes FNV-1a from up to 64 input
+bytes and prints a hex result: 71 sizes are checked against an independent
+Python reference and native execution. FNV-1a is not cryptographic. No claim
+of general C execution or PlayStation/Windows compatibility follows.

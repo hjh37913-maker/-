@@ -4,7 +4,7 @@ import platform
 import subprocess
 import sys
 
-cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions, strings = sys.argv[1:]
+cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions, strings, compiled_hash = sys.argv[1:]
 def guest(file, budget='100', *argv):
     return subprocess.run([cli, '--run-linux-elf', file, budget, *argv], capture_output=True)
 q=guest(hello)
@@ -45,6 +45,18 @@ assert q.returncode==0 and q.stdout==b'Multiply OK\n', (q.returncode,q.stdout,q.
 if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
     native=subprocess.run([multiply],capture_output=True)
     assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+# A compiler-generated, freestanding C ELF combines read, byte loads,
+# arithmetic, IMUL, shifts, indexed lookup, stores, and write.
+for size in range(71):
+    sample=bytes((i*73+size*11)&255 for i in range(size))
+    h=2166136261
+    for byte in sample[:64]: h=((h^byte)*16777619)&0xffffffff
+    expected=f'{h:08x}\n'.encode()
+    q=subprocess.run([cli,'--run-linux-elf-stdin',compiled_hash,'2000'],input=sample,capture_output=True)
+    assert q.returncode==0 and q.stdout==expected, (size,q.returncode,q.stdout,q.stderr)
+    if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
+        native=subprocess.run([compiled_hash],input=sample,capture_output=True)
+        assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
 q=guest(strings)
 assert q.returncode==0 and q.stdout==b'String OK\n', (q.returncode,q.stdout,q.stderr)
 if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
