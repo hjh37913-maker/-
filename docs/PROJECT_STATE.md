@@ -17,8 +17,17 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 137 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 138 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current file-fixture differential batch
+
+Added a test-only runner and randomized differential driver for the original
+compiled C file fixture. On Linux, 45,000 executions matched Python reference
+and native temporary-file executions across five deterministic seeds; sizes
+0–96 bytes include the intentional oversize error path. Linux Debug, Release
+and ASan+UBSan passed 138/138 CTests. Windows runner cross-compiled only.
+These are test files, not games or PS5 software.
 
 ## Current POPCNT batch
 

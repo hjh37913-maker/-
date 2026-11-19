@@ -101,3 +101,11 @@ read-only protection, hashing, output and unmapping.
 The long-running write soak repeatedly
 executes the frozen native oracle; its detailed result is recorded separately.
 Windows x64 was cross-compiled, not runtime tested.
+
+The authored `linux-file-c.elf` additionally runs with generated fixture data
+via the test-only `linux_file_fixture_runner`. The Python stress driver checks
+the 0–96-byte inputs and exit statuses against a Python reference and, on
+Linux x86-64, the same original ELF reading a private temporary host file.
+Guest file paths remain virtual. Reproduce with
+`python3 scripts/stress_linux_files.py --runner build-verify-release/linux_file_fixture_runner --cases 5000`.
+These finite comparisons do not imply arbitrary program, OS or game support.
