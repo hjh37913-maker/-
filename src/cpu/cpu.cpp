@@ -118,6 +118,29 @@ void group_logical64(CpuState& state, std::uint64_t& dst, std::uint64_t rhs, uns
     if (extension==1) dst|=rhs; else if (extension==4) dst&=rhs; else dst^=rhs;
     logical_test(state,dst);
 }
+// Portable upper half of a 64x64 unsigned product using 32-bit limbs.
+std::uint64_t multiply_high64(std::uint64_t a,std::uint64_t b) {
+    const auto a0=std::uint64_t{static_cast<std::uint32_t>(a)}, a1=a>>32;
+    const auto b0=std::uint64_t{static_cast<std::uint32_t>(b)}, b1=b>>32;
+    const auto p00=a0*b0, p01=a0*b1, p10=a1*b0, p11=a1*b1;
+    const auto middle=(p00>>32)+static_cast<std::uint32_t>(p01)+static_cast<std::uint32_t>(p10);
+    return p11+(p01>>32)+(p10>>32)+(middle>>32);
+}
+// Signed multiplication using unsigned arithmetic, avoiding signed overflow and
+// compiler-specific 128-bit types (including in Windows/MSVC builds).
+std::uint64_t imul_value(CpuState& state,std::uint64_t a,std::uint64_t b,unsigned width) {
+    const auto mask=width==16 ? 0xffffULL : width==32 ? 0xffffffffULL : ~std::uint64_t{0};
+    const auto sign=std::uint64_t{1}<<(width-1);
+    a&=mask; b&=mask;
+    const bool negative=bool(a&sign)!=bool(b&sign);
+    const auto mag_a=(a&sign)?(std::uint64_t{0}-a)&mask:a;
+    const auto mag_b=(b&sign)?(std::uint64_t{0}-b)&mask:b;
+    const auto limit=negative?sign:sign-1;
+    const bool overflow=mag_b && mag_a>limit/mag_b;
+    constexpr std::uint64_t flags=(1ULL<<0)|(1ULL<<11);
+    state.rflags=(state.rflags&~flags)|(overflow?flags:0); // undefined flags preserved
+    return (a*b)&mask;
+}
 // SHL/SHR/SAR: undefined AF and OF for counts greater than one are
 // preserved in this model. Counts have already been masked to 5/6 bits.
 std::uint64_t shift_value(CpuState& state, std::uint64_t operand, unsigned width, unsigned extension, unsigned count) {
@@ -151,6 +174,144 @@ StepResult Cpu::step(Memory& memory) {
     if (b[0] == 0x90 || b[0] == 0xf4) {
         ++state.rip;
         return b[0] == 0xf4 ? StepResult::halted : StepResult::running;
+    }
+    // CBW, CWDE and CDQE: sign-extend accumulator into the next size.
+    if (b[0]==0x98) { state.rax=static_cast<std::uint32_t>(sign_extend(state.rax&0xffff,16)); ++state.rip; return StepResult::running; }
+    if (b[0]==0x66 || b[0]==0x48) {
+        if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        if (b[1]==0x98) {
+            if (b[0]==0x66) state.rax=(state.rax&~0xffffULL)|(sign_extend(state.rax&0xff,8)&0xffff);
+            else state.rax=sign_extend(state.rax&0xffffffffULL,32);
+            state.rip+=2; return StepResult::running;
+        }
+    }
+    // Sign-extension of accumulator into the data:accumulator pair.
+    // Only the accumulator and data registers are touched; flags are unchanged.
+    if (b[0]==0x99) { *state.reg(2)=(state.rax&0x80000000ULL)?0xffffffffULL:0; ++state.rip; return StepResult::running; }
+    if (b[0]==0x48) {
+        if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        if (b[1]==0x99) { *state.reg(2)=(state.rax>>63)?~std::uint64_t{0}:0; state.rip+=2; return StepResult::running; }
+    }
+    if (b[0]==0x66) {
+        if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        if (b[1]==0x99) { auto& rdx=*state.reg(2); rdx=(rdx&~0xffffULL)|((state.rax&0x8000)?0xffffULL:0); state.rip+=2; return StepResult::running; }
+    }
+    // Byte MUL/IMUL: AL times r/m8, full product in AX. REX changes
+    // encodings 4..7 from AH..BH to SPL..DIL.
+    if (b[0]==0xf6 || (b[0]>=0x40 && b[0]<=0x4f)) {
+        const bool has_rex=b[0]!=0xf6; const auto rex=has_rex?b[0]:std::uint8_t{0};
+        const unsigned op_pos=has_rex?1:0;
+        if (has_rex && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        if (b[op_pos]==0xf6) {
+            const auto modrm_pos=op_pos+1;
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned ext=(b[modrm_pos]>>3)&7;
+            if (ext==4 || ext==5) {
+                const unsigned mod=b[modrm_pos]>>6, low_rm=b[modrm_pos]&7;
+                unsigned length=modrm_pos+1; std::uint64_t source=0;
+                if(mod==3) source=(!has_rex && low_rm>=4)?(*state.reg(low_rm-4)>>8)&0xff:*state.reg(low_rm+((rex&1)?8:0))&0xff;
+                else {
+                    std::uint64_t address=0; std::array<std::uint8_t,1> value{};
+                    if (!effective_address(memory,state,b,modrm_pos,rex,0,address,length) || !memory.read(address,value)) return StepResult::memory_fault;
+                    source=value[0];
+                }
+                const auto lhs=state.rax&0xff;
+                const auto low=(lhs*source)&0xff;
+                auto high=((lhs*source)>>8)&0xff;
+                if(ext==5) { if(lhs&0x80) high=(high-source)&0xff; if(source&0x80) high=(high-lhs)&0xff; }
+                const bool overflow=ext==4?high!=0:high!=((low&0x80)?0xff:0);
+                state.rax=(state.rax&~0xffffULL)|(high<<8)|low;
+                constexpr auto flags=(1ULL<<0)|(1ULL<<11);
+                state.rflags=(state.rflags&~flags)|(overflow?flags:0);
+                state.rip+=length; return StepResult::running;
+            }
+        }
+    }
+    // One-operand MUL/IMUL: full-width product in DX:AX, EDX:EAX or
+    // RDX:RAX. Undefined flags are preserved; no host-specific 128-bit type.
+    if (b[0]==0xf7 || b[0]==0x66 || (b[0]>=0x40 && b[0]<=0x4f)) {
+        const bool word=b[0]==0x66; unsigned pos=word?1:0;
+        if (word && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        const bool has_rex=b[pos]>=0x40 && b[pos]<=0x4f;
+        const auto rex=has_rex?b[pos]:std::uint8_t{0};
+        if (has_rex) { ++pos; if (!memory.fetch(state.rip,std::span(b).first(pos+1))) return StepResult::memory_fault; }
+        if (b[pos]==0xf7) {
+            const unsigned modrm_pos=pos+1;
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned ext=(b[modrm_pos]>>3)&7;
+            if (ext==4 || ext==5) {
+                if (word && (rex&8)) return StepResult::invalid_instruction;
+                const unsigned width=word?16:(rex&8)?64:32;
+                const auto mask=word?0xffffULL:width==32?0xffffffffULL:~std::uint64_t{0};
+                const auto sign=std::uint64_t{1}<<(width-1);
+                const unsigned mod=b[modrm_pos]>>6, rm=(b[modrm_pos]&7)+((rex&1)?8:0);
+                std::uint64_t source=0; unsigned length=modrm_pos+1;
+                if(mod==3) source=*state.reg(rm)&mask;
+                else {
+                    std::uint64_t address=0;
+                    if (!effective_address(memory,state,b,modrm_pos,rex,0,address,length)) return StepResult::memory_fault;
+                    std::array<std::uint8_t,8> value{};
+                    if (!memory.read(address,std::span(value).first(width/8))) return StepResult::memory_fault;
+                    source=little(value.data(),width/8);
+                }
+                const auto lhs=state.rax&mask, low=(lhs*source)&mask;
+                auto high=width==64?multiply_high64(lhs,source):((lhs*source)>>width)&mask;
+                if (ext==5) {
+                    if(lhs&sign) high=(high-source)&mask;
+                    if(source&sign) high=(high-lhs)&mask;
+                }
+                const bool overflow=ext==4?high!=0:high!=((low&sign)?mask:0);
+                auto& rdx=*state.reg(2);
+                if(word) { state.rax=(state.rax&~mask)|low; rdx=(rdx&~mask)|high; }
+                else { state.rax=low; rdx=high; }
+                constexpr auto flags=(1ULL<<0)|(1ULL<<11);
+                state.rflags=(state.rflags&~flags)|(overflow?flags:0);
+                state.rip+=length; return StepResult::running;
+            }
+        }
+    }
+    // IMUL r16/r32/r64, r/m and the 69/6B immediate forms. Memory and
+    // instruction bytes are read before committing the register or flags.
+    if (b[0]==0x0f || b[0]==0x69 || b[0]==0x6b || b[0]==0x66 || (b[0]>=0x40 && b[0]<=0x4f)) {
+        const bool word=b[0]==0x66;
+        unsigned op_pos=word?1:0;
+        if (word && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        const bool has_rex=b[op_pos]>=0x40 && b[op_pos]<=0x4f;
+        const auto rex=has_rex?b[op_pos]:std::uint8_t{0};
+        if (has_rex) { ++op_pos; if (!memory.fetch(state.rip,std::span(b).first(op_pos+1))) return StepResult::memory_fault; }
+        const auto op=b[op_pos];
+        bool imul=op==0x69 || op==0x6b;
+        if (op==0x0f) {
+            if (!memory.fetch(state.rip,std::span(b).first(op_pos+2))) return StepResult::memory_fault;
+            imul=b[op_pos+1]==0xaf;
+        }
+        if (imul) {
+            if (word && (rex&8)) return StepResult::invalid_instruction;
+            const unsigned width=word?16:(rex&8)?64:32;
+            const unsigned immediate_size=op==0x69?(word?2:4):op==0x6b?1:0;
+            const unsigned modrm_pos=op_pos+(op==0x0f?2:1);
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned mod=b[modrm_pos]>>6;
+            const unsigned reg=((b[modrm_pos]>>3)&7)+((rex&4)?8:0);
+            const unsigned rm=(b[modrm_pos]&7)+((rex&1)?8:0);
+            unsigned length=modrm_pos+1; std::uint64_t source=0;
+            if (mod==3) {
+                length+=immediate_size;
+                if (immediate_size && !memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
+                source=*state.reg(rm);
+            } else {
+                std::uint64_t address=0;
+                if (!effective_address(memory,state,b,modrm_pos,rex,immediate_size,address,length)) return StepResult::memory_fault;
+                std::array<std::uint8_t,8> value{};
+                if (!memory.read(address,std::span(value).first(width/8))) return StepResult::memory_fault;
+                source=little(value.data(),width/8);
+            }
+            const auto rhs=immediate_size?sign_extend(little(b.data()+length-immediate_size,immediate_size),immediate_size*8):*state.reg(reg);
+            const auto result=imul_value(state,source,rhs,width);
+            auto& destination=*state.reg(reg);
+            destination=word?(destination&~0xffffULL)|result:result;
+            state.rip+=length; return StepResult::running;
+        }
     }
     // Operand-size override MOV: word register/memory/immediate forms.
     // Only one optional REX prefix after 66 is supported. REX.W overrides

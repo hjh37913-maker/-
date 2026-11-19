@@ -87,3 +87,34 @@ support NOT/NEG r/m32 and r/m64. `66 89/8b/c7 /0` and `66 b8..bf` support
 REX.W following 66 is currently rejected, not modeled as the 64-bit form.
 Tests cover permission faults and compare equivalent native register or
 memory operations as documented in the individual test sources.
+
+## Multiplication and accumulator extension experiment
+
+- `F6 /4,/5` provide one-operand MUL/IMUL on 8-bit register or memory
+  sources; the 16-bit result is written to AX. Legacy AH..BH sources and
+  REX-selected low-byte/extended sources are distinguished.
+- `F7 /4,/5` provide one-operand MUL/IMUL on 16/32/64-bit register or
+  memory sources, producing DX:AX, EDX:EAX or RDX:RAX. Portable unsigned
+  limb arithmetic supplies the 64-bit high half without compiler-specific
+  128-bit types. Source values are staged before destination writes.
+- `0F AF`, `69`, `6B` implement two-/three-operand signed IMUL for 16/32/64
+  bits, with register or memory sources and sign-extended immediates. The
+  16-bit form preserves upper register bits; the 32-bit form zero-extends.
+- CF and OF signal truncation; undefined PF/AF/ZF/SF are preserved by the
+  model and must not be relied on. Fetch or source faults leave state intact.
+  `66` combined with REX.W is rejected rather than treated as a 64-bit form;
+  other prefix combinations are not a general decoder implementation.
+- Exact encodings `98`, `66 98`, `48 98` implement CWDE, CBW and CDQE;
+  `99`, `66 99`, `48 99` implement CDQ, CWD and CQO. Flags are preserved;
+  arbitrary redundant REX/prefix combinations are not supported.
+
+On Linux x86-64 the independent native instruction tests include 458,752
+one-operand MUL/IMUL comparisons (including all 65,536 byte input pairs
+for each signedness and guest source form), 196,608 selected two-/three-
+operand IMUL comparisons and 98,304 accumulator-extension comparisons.
+Guest register/memory variants are compared to equivalent native operands;
+this does not validate host address decoding or every immediate encoding.
+Portable tests additionally cover selected instruction/permission faults,
+RIP-relative addressing, REX extensions and register aliases. An original
+static Linux test ELF checks multiplication, sign extension, output and exit
+against native execution. Windows was cross-compiled, not executed.
