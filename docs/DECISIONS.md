@@ -32,3 +32,5 @@
 2026-11-19 continuation: Added only unprefixed 32-bit register forms required by an independently compiled C loop, with correct zero-extension and defined-flag behavior. Memory operands and REX-extended 32-bit forms remain rejected. JMP rel32 was added independently. Native differential tests were added before compatibility claims.
 
 2026-11-19 continuation: Refactored effective-address calculation into a shared CPU decoder to implement unprefixed 32-bit memory MOV and LEA without duplicating SIB/RIP-relative handling. Immediate bytes are included when calculating RIP-relative addresses. Arithmetic memory and 32-bit REX forms remain unsupported. This work enables only original synthetic/freestanding test programs, not PS5 binaries.
+
+2026-11-19 continuation: Added selected unprefixed 32-bit memory arithmetic forms with staged CPU state for write faults. This models single-threaded instruction outcomes only: read-modify-write is not host-atomic and LOCK is not supported. Cross-checks against register forms are not independent native differential tests.

@@ -39,3 +39,6 @@ The C compiler and linker versions or flags may generate different instructions 
 
 ## 32-bit array fixture
 `array-demo.c` and `array-demo.elf` are an original freestanding C example compiled using GCC 12.2 and the same flags as above. The function uses local 32-bit values and returns 42. Run `./build/nightfall_cli --run-elf examples/array-demo.elf 100`. The ELF uses the synthetic HLT sentinel: **do not execute it directly on the host**. No OS or PS5 interface is exercised.
+
+## Memory arithmetic fixture
+`memory-arithmetic-demo.c` uses explicit inline x86 assembly for 32-bit memory ADD/SUB/CMP, compiled with GCC 12.2 using the same freestanding flags as the array fixture. Run `./build/nightfall_cli --run-elf examples/memory-arithmetic-demo.elf 100` and expect RAX=42 at synthetic HLT. Do not execute the ELF directly on the host. It does not exercise any OS or console interface.

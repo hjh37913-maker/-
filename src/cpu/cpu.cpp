@@ -191,27 +191,47 @@ StepResult Cpu::step(Memory& memory) {
         if (taken) state.rip+=sign_extend(little(b.data()+2,4),32);
         return StepResult::running;
     }
-    // Unprefixed 32-bit forms; memory is supported only for MOV and LEA.
+    // Selected unprefixed 32-bit register and memory forms.
     const auto op32=b[0];
     if (op32==0x83 || op32==0x85 || op32==0x89 || op32==0x8b || op32==0x8d || op32==0xc7 || op32==0x01 || op32==0x03 ||
         op32==0x29 || op32==0x2b || op32==0x39 || op32==0x3b) {
         if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
         const unsigned mod=b[1]>>6, reg=(b[1]>>3)&7, rm=b[1]&7;
         if (mod!=3) {
-            if (op32!=0x89 && op32!=0x8b && op32!=0x8d && op32!=0xc7) return StepResult::invalid_instruction;
-            if (op32==0xc7 && reg!=0) return StepResult::invalid_instruction;
+            if ((op32==0xc7 && reg!=0) ||
+                (op32==0x83 && reg!=0 && reg!=5 && reg!=7)) return StepResult::invalid_instruction;
             std::uint64_t address=0; unsigned length=0;
-            if (!effective_address(memory,state,b,1,0,op32==0xc7?4:0,address,length)) return StepResult::memory_fault;
+            const unsigned trailing=op32==0xc7?4:(op32==0x83?1:0);
+            if (!effective_address(memory,state,b,1,0,trailing,address,length)) return StepResult::memory_fault;
             if (op32==0x8d) *state.reg(reg)=static_cast<std::uint32_t>(address);
-            else if (op32==0x8b) {
-                std::array<std::uint8_t,4> data{};
-                if (!memory.read(address,data)) return StepResult::memory_fault;
-                *state.reg(reg)=little(data.data(),4);
-            } else {
+            else if (op32==0x89 || op32==0xc7) {
                 const auto value=op32==0xc7 ? static_cast<std::uint32_t>(little(b.data()+length-4,4)) : static_cast<std::uint32_t>(*state.reg(reg));
                 std::array<std::uint8_t,4> data{};
                 for (unsigned i=0;i<4;++i) data[i]=static_cast<std::uint8_t>(value>>(8*i));
                 if (!memory.write(address,data)) return StepResult::memory_fault;
+            } else {
+                std::array<std::uint8_t,4> data{};
+                if (!memory.read(address,data)) return StepResult::memory_fault;
+                const auto value=static_cast<std::uint32_t>(little(data.data(),4));
+                if (op32==0x8b) *state.reg(reg)=value;
+                else if (op32==0x85) logical_test32(state,value & static_cast<std::uint32_t>(*state.reg(reg)));
+                else {
+                    const bool to_reg=op32==0x03 || op32==0x2b || op32==0x3b;
+                    const bool compare=op32==0x39 || op32==0x3b || (op32==0x83 && reg==7);
+                    const bool subtract=op32==0x29 || op32==0x2b || compare || (op32==0x83 && reg==5);
+                    const auto rhs=op32==0x83 ? static_cast<std::uint32_t>(sign_extend(b[length-1],8)) :
+                                   to_reg ? value : static_cast<std::uint32_t>(*state.reg(reg));
+                    // Stage flags and result so a failed write does not change CPU state.
+                    auto next=state;
+                    std::uint64_t dst=to_reg ? *state.reg(reg) : value;
+                    arithmetic32(next,dst,rhs,subtract,compare);
+                    if (!to_reg && !compare) {
+                        for (unsigned i=0;i<4;++i) data[i]=static_cast<std::uint8_t>(dst>>(8*i));
+                        if (!memory.write(address,data)) return StepResult::memory_fault;
+                    }
+                    if (to_reg && !compare) *next.reg(reg)=dst;
+                    state=next;
+                }
             }
             state.rip+=length; return StepResult::running;
         }
