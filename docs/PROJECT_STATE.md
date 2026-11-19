@@ -20,6 +20,14 @@
 | Coverage | Measured, limited | 150 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
+## Current explicit SCE-style dependency identities
+
+The synthetic raw relocation API can validate caller-asserted module/library
+names, IDs and versions and match encoded import qualifiers. Assertions do
+not load or implement any module. Debug and Release 150/150 passed; the full
+ASan+UBSan suite passed separately after the combined verification timed out.
+Windows cross-compiled only. No real PS5 file or game was tested.
+
 ## Current candidate module/library analysis
 
 The passive candidate-ELF inspector can report module/library declarations

@@ -105,8 +105,12 @@ It stages bounded PT_LOAD mappings, parses OS-tagged symbol/string and RELA
 or PLT-RELA metadata, applies selected x86-64 RELATIVE, 64, GLOB_DAT and
 JUMP_SLOT relocations, and resolves imports only against a caller-provided
 name-to-guest-address table. It never calls or resolves host functions.
-Unknown program headers/dynamic tags, module dependencies, TLS, missing
-bindings, and unsupported relocations fail without committing machine state.
+Unknown program headers/dynamic tags, TLS, missing bindings or dependency
+identities, and unsupported relocations fail without committing machine state.
+A caller may explicitly assert bounded module/library identity/version records;
+when such declarations are present, encoded import qualifiers must match them.
+The caller assertions do not load modules or prove that any implementation
+exists. No real console module or OS library is provided.
 The sole executable scenario is a **synthetic test constructed from scratch**,
 with a synthetic guest stub and a Linux test exit, checked at three load biases
 on both memory backends. The API is not exposed as a PS5 game launch mode.
@@ -114,7 +118,7 @@ on both memory backends. The API is not exposed as a PS5 game launch mode.
 This is not a full PS5 loader, ABI, dynamic linker, sandbox, or a validated
 implementation of console behavior. No authentic PS5 executable, protected
 container, game, firmware, decryption or keys were used. Actual platform
-program headers, module/library resolution, initialization, thread-local
+program headers, actual module loading/library implementation, initialization, thread-local
 storage, exceptions, OS services, GPU/shaders, and game behavior remain
 unimplemented or unverified. Acceptance of a raw file in this subset does not
 identify its platform or establish validity/compatibility.

@@ -1,4 +1,5 @@
 #include "loader/sce_import_inspect.h"
+#include "loader/sce_id.h"
 #include "storage/storage.h"
 #include <span>
 #include <system_error>
@@ -6,12 +7,7 @@ namespace nightfall::loader {
 namespace {
 std::uint64_t le(std::span<const std::uint8_t>b,std::size_t p,unsigned n){std::uint64_t x=0;for(unsigned i=0;i<n;++i)x|=std::uint64_t(b[p+i])<<(8*i);return x;}
 bool fits(std::uint64_t p,std::uint64_t n,std::uint64_t size){return p<=size&&n<=size-p;}
-// Numeric declaration IDs are represented as a compact big-endian radix-64
-// token in encoded symbol names; no NID hashing or decoding is performed.
-std::string id_token(std::uint16_t id){
- constexpr char alphabet[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-";
- std::string out;do{out.insert(out.begin(),alphabet[id%64]);id=static_cast<std::uint16_t>(id/64);}while(id);return out;
-}
+
 }
 const char* sce_inspect_status_name(SceInspectStatus s) noexcept {
  switch(s){case SceInspectStatus::ok:return "ok";case SceInspectStatus::read_error:return "read_error";case SceInspectStatus::not_elf:return "not_elf";case SceInspectStatus::unsupported:return "unsupported";case SceInspectStatus::malformed:return "malformed";case SceInspectStatus::resource_limit:return "resource_limit";}
@@ -87,20 +83,13 @@ SceImportReport inspect_sce_imports(const std::filesystem::path& path){
   std::vector<int>* table=decl.kind==SceDeclarationKind::imported_library?&libraries:decl.kind==SceDeclarationKind::imported_module?&modules:nullptr;
   if(table){auto& slot=(*table)[decl.id];slot=slot==-1?static_cast<int>(i):-2;}
  }
- auto decode_token=[](std::string_view token,int& result){
-  constexpr std::string_view alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-";
-  if(token.empty()||token.size()>3)return false;
-  unsigned value=0;for(char ch:token){const auto digit=alphabet.find(ch);if(digit==alphabet.npos)return false;value=value*64+static_cast<unsigned>(digit);}
-  if(value>65535||id_token(static_cast<std::uint16_t>(value))!=token)return false;
-  result=static_cast<int>(value);return true;
- };
  for(auto& item:out.imports){
   const auto first=item.encoded_name.find('#');if(first==std::string::npos||first==0)continue;
   const auto second=item.encoded_name.find('#',first+1);
   if(second==std::string::npos||second==first+1||second+1==item.encoded_name.size()||item.encoded_name.find('#',second+1)!=std::string::npos)continue;
-  item.qualified=true;int lib=0,mod=0;
-  if(decode_token(std::string_view(item.encoded_name).substr(first+1,second-first-1),lib)&&libraries[lib]>=0)item.library_declaration=libraries[lib];
-  if(decode_token(std::string_view(item.encoded_name).substr(second+1),mod)&&modules[mod]>=0)item.module_declaration=modules[mod];
+  item.qualified=true;std::uint16_t lib=0,mod=0;
+  if(sce_parse_id_token(std::string_view(item.encoded_name).substr(first+1,second-first-1),lib)&&libraries[lib]>=0)item.library_declaration=libraries[lib];
+  if(sce_parse_id_token(std::string_view(item.encoded_name).substr(second+1),mod)&&modules[mod]>=0)item.module_declaration=modules[mod];
  }
  auto parse_relocations=[&](std::uint64_t offset,std::uint64_t length,bool plt){
   if(!length)return SceInspectStatus::ok;

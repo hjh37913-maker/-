@@ -36,7 +36,7 @@ int main(){auto b=fixture();
  {auto x=b;put(x,16,3,2);CHECK(rejected(x,bind,ElfStatus::unsupported));}
  {auto x=b;put(x,18,183,2);CHECK(rejected(x,bind,ElfStatus::unsupported));}
  {auto x=b;put(x,64,0x61000001,4);CHECK(rejected(x,bind,ElfStatus::unsupported));}
- {auto x=b;put(x,0x600,0x6100000f,8);CHECK(rejected(x,bind,ElfStatus::unsupported));} // dependencies not supported
+ {auto x=b;put(x,0x600,0x61000011,8);CHECK(rejected(x,bind,ElfStatus::unsupported));} // unknown attributes not supported
  {auto x=b;put(x,0x610,0x61000035,8);CHECK(rejected(x,bind,ElfStatus::malformed));}
  {auto x=b;put(x,0x608,UINT64_MAX,8);CHECK(rejected(x,bind,ElfStatus::malformed));}
  {auto x=b;put(x,0x618,0x100000,8);CHECK(rejected(x,bind,ElfStatus::resource_limit));}
@@ -47,5 +47,22 @@ int main(){auto b=fixture();
  {auto x=b;put(x,0x6a8,1,8);CHECK(rejected(x,bind,ElfStatus::malformed));}
  {auto x=b;put(x,0xa18,0x1000,8);CHECK(rejected(x,bind,ElfStatus::malformed));} // failure after staged relocation
  {std::array<ImportBinding,2> duplicate{{bind[0],bind[0]}};CHECK(rejected(b,duplicate,ElfStatus::malformed));}
+ // Explicit module/library identity contracts: no host library is loaded.
+ {auto x=b;put(x,64+2*56+32,224,8);put(x,64+2*56+40,224,8);
+  put(x,0x6b0,0x6100000f,8);put(x,0x6b8,(1ULL<<48)|(2ULL<<40)|(3ULL<<32)|16,8);
+  put(x,0x6c0,0x61000015,8);put(x,0x6c8,(4ULL<<32)|24,8);put(x,0x6d0,0,8);
+  const std::string module="module",library="library";for(std::size_t j=0;j<module.size();++j)x[0x810+j]=module[j];for(std::size_t j=0;j<library.size();++j)x[0x818+j]=library[j];
+  std::array<SceDependencyBinding,2> deps{{{SceDependencyKind::module,1,2,3,"module"},{SceDependencyKind::library,0,4,0,"library"}}};
+  Machine m(0x100000);std::string missing;
+  CHECK(load_sce_raw_relocatable(x,m,0x10000,0xf0000,0x10000,bind,&missing)==ElfStatus::unresolved_dependency&&missing=="module");
+  CHECK(load_sce_raw_relocatable(x,m,0x10000,0xf0000,0x10000,bind,&missing,deps)==ElfStatus::ok&&missing.empty());
+  CHECK(prepare_linux_stack(m,0xf0000,0x10000,std::array<std::string,1>{"synthetic"}));LinuxProcess p(m);CHECK(p.run(100).exit_code==42);
+  auto wrong=deps;wrong[0].version_minor=4;Machine n(0x100000);n.cpu.state.rip=99;
+  CHECK(load_sce_raw_relocatable(x,n,0x10000,0xf0000,0x10000,bind,&missing,wrong)==ElfStatus::unresolved_dependency&&missing=="module"&&n.cpu.state.rip==99);
+  auto bad=x;bad[0x80c]='C';CHECK(load_sce_raw_relocatable(bad,n,0x10000,0xf0000,0x10000,bind,&missing,deps)==ElfStatus::malformed);
+  auto dup=x;put(dup,64+2*56+32,240,8);put(dup,64+2*56+40,240,8);put(dup,0x6d0,0x6100000f,8);put(dup,0x6d8,(1ULL<<48)|16,8);put(dup,0x6e0,0,8);
+  CHECK(load_sce_raw_relocatable(dup,n,0x10000,0xf0000,0x10000,bind,&missing,deps)==ElfStatus::malformed);
+  auto repeated=deps;repeated[1]=deps[0];CHECK(load_sce_raw_relocatable(x,n,0x10000,0xf0000,0x10000,bind,&missing,repeated)==ElfStatus::malformed);
+ }
  std::cout<<"synthetic raw SCE-style RELA/JUMP_SLOT, explicit bindings and rollback passed\n";
 }
