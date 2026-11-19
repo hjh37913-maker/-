@@ -14,7 +14,11 @@ struct Pixel {
 struct Clear { Pixel color; };
 struct Fill { std::uint32_t x, y, width, height; Pixel color; };
 struct Copy { std::uint32_t sx, sy, dx, dy, width, height; };
-using Command = std::variant<Clear, Fill, Copy>;
+// Integer pixel-space vertices. Pixel centers and a top-left fill rule are used.
+// Coordinates outside [-32768,32767] are rejected to bound edge arithmetic.
+struct Point { std::int32_t x, y; };
+struct Triangle { Point a, b, c; Pixel color; };
+using Command = std::variant<Clear, Fill, Copy, Triangle>;
 // CPU-only RGBA8 software reference. Not a console GPU or a sandbox.
 class Surface {
 public:

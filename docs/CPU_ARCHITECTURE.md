@@ -19,7 +19,7 @@ The interpreter recognizes these specific encodings only:
 - `48..4f 85 /r` TEST between a 64-bit register and register or memory. CF and OF are cleared; ZF, SF and PF follow the AND result. AF is undefined by x86 and is preserved by this model.
 - `eb rel8` and `e9 rel32` JMP, `70..7f rel8` and `0f 80..8f rel32` for all sixteen conditional branches. The displacement is sign-extended from the end of the instruction. Target arithmetic wraps as unsigned 64-bit; invalid target access is reported on the next fetch. Canonical-address checks and architectural exceptions are not modeled.
 
-ADD/SUB/CMP update CF/PF/AF/ZF/SF/OF, preserving other modeled flag bits. CMP and TEST do not change their operands; MOV and branches do not change flags. State represents 16 general-purpose registers, RIP and RFLAGS; `reg(index)` follows x86 encoding order and returns null for indices outside 0–15. Decode and memory faults leave state unchanged. Instruction bytes require execute permission independently of read permission; this is an experimental abstraction, not a claim about console faults. Only the listed byte and word forms and 32-bit REX forms are supported. Far CALL/RET and other indirect control-flow variants, the full stack instruction set, modes, architectural exceptions, SIMD, floating point, threading, and a PS5 CPU feature model are not implemented.
+ADD/SUB/CMP update CF/PF/AF/ZF/SF/OF, preserving other modeled flag bits. CMP and TEST do not change their operands; MOV and branches do not change flags. State represents 16 general-purpose registers, RIP and RFLAGS; `reg(index)` follows x86 encoding order and returns null for indices outside 0–15. Decode and memory faults leave state unchanged. Instruction bytes require execute permission independently of read permission; this is an experimental abstraction, not a claim about console faults. Only the listed byte, word and 32-bit REX forms are supported. Far CALL/RET and other indirect control-flow variants, the full stack instruction set, modes, architectural exceptions, SIMD, floating point, threading, and a PS5 CPU feature model are not implemented.
 
 On Linux x86-64 with GCC/Clang, native differential tests compare immediate ADD/SUB/CMP against equivalent native register arithmetic: 20,108 cases per operation. Register-form MOV/ADD/SUB/CMP have 32,768 native-reference cases over every source/destination register and both encodings. The 64-bit imm8 ADD/SUB/CMP forms have 12,288 Linux native-reference cases covering all immediate byte values and all 16 destination registers; 32-bit register and imm8 forms have 15,360 native-reference cases. A further 320 32-bit and 1,280 64-bit portable MOV memory combinations check both directions, supported registers, displacements and access faults against expected data; they are not a native differential test. The original 29,440 portable 32-bit memory arithmetic cross-checks compare against interpreter register forms, not an independent oracle. Separate Linux x86-64 native tests exercise 36,864 32-bit and 36,864 64-bit memory register arithmetic/TEST/XOR cases (no memory immediate forms), 4,096 32-bit register XOR cases and 8,192 64-bit register XOR cases against native instructions. The 24,576 group-1 imm32 cases compare both register and memory forms to native register arithmetic with the decoded equivalent operand; the native oracle does not execute the same immediate instruction encoding or guest address calculation. Fault and permission cases are also checked. TEST has 8,192 native-reference cases excluding architecturally undefined AF. Indirect control flow has 6,144 portable register scenarios plus memory and fault cases; these are synthetic, not native differential. SIB, RIP-relative, stack and call tests are synthetic rather than native differential. Branch conditions are checked against explicit truth tables for 1,024 short/near combinations, not against a native branch oracle. Tests are not exhaustive. See TESTING.md.
 
@@ -70,3 +70,20 @@ faults; 32,768 native memory cases cover byte transfers including AH.
 forms for 32/64-bit destinations. Their defined flags follow the other logical
 instructions; undefined AF is preserved. 49,152 comparisons use native
 register operations as the oracle, not native immediate encodings.
+
+## Later instruction expansion
+`D1/D3/C1 /4,/5,/7` implement SHL/SHR/SAR for r/m32 and r/m64, using
+implicit 1, CL or immediate counts with x86 5/6-bit masking and optional REX
+register extensions. CF/PF/ZF/SF are defined for nonzero counts; OF is
+updated only for count one; undefined AF and OF for larger counts are
+preserved by this model. Count zero preserves flags, and a 32-bit register
+destination still zero-extends. Memory RMW requires write permission even
+for zero count in this model; atomic LOCK is unsupported. Native tests compare
+equivalent register shifts, not the immediate encoding or guest addresses.
+
+`FF /0,/1` support INC/DEC r/m32 and r/m64, preserving CF; `F7 /2,/3`
+support NOT/NEG r/m32 and r/m64. `66 89/8b/c7 /0` and `66 b8..bf` support
+16-bit MOV forms, with optional non-W REX and preserved upper register bits.
+REX.W following 66 is currently rejected, not modeled as the 64-bit form.
+Tests cover permission faults and compare equivalent native register or
+memory operations as documented in the individual test sources.

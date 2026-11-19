@@ -7,10 +7,13 @@ int main(int argc,char** argv) {
     if (argc!=2) { std::cerr << "Usage: nightfall_graphics_demo output.ppm\n"; return 2; }
     auto surface=Surface::create(320,180,320*180);
     if (!surface) return 1;
-    const std::array<Command,6> commands{Clear{Pixel{10,16,32,255}},
+    const std::array<Command,9> commands{Clear{Pixel{10,16,32,255}},
         Fill{16,16,288,148,Pixel{23,34,55,255}}, Fill{30,30,260,12,Pixel{92,216,206,255}},
         Fill{30,55,115,86,Pixel{49,75,111,255}}, Fill{155,55,135,36,Pixel{43,59,85,255}},
-        Fill{155,101,135,40,Pixel{36,48,69,255}}};
+        Fill{155,101,135,40,Pixel{36,48,69,255}},
+        Triangle{{43,131},{87,65},{132,131},Pixel{92,216,206,255}},
+        Triangle{{87,65},{132,131},{112,131},Pixel{159,235,224,255}},
+        Triangle{{167,127},{194,84},{222,127},Pixel{239,189,94,255}}};
     if (!surface->execute(commands)) return 1;
     std::ofstream out(argv[1],std::ios::binary);
     if (!out) { std::cerr << "Cannot open output\n"; return 1; }

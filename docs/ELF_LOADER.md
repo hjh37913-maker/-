@@ -8,4 +8,17 @@ The loader accepts little-endian ELF64 `ET_EXEC` for machine x86-64 with a bound
 `--run-elf` reads at most 1 MiB into a 1 MiB synthetic address space with the top 64 KiB reserved as stack, then executes with an explicit instruction budget (10,000 by default, at most 1,000,000). Example: `./build/nightfall_cli --run-elf examples/elf-demo.elf 5`. The example is an original static binary assembled from `examples/elf-demo.s`; expected RAX is 42. A second original fixture, `compiler-demo.elf`, was compiled from C and also returns 42; it is freestanding and relies on no OS services. Regenerate on Linux with GNU binutils using `as --64 examples/elf-demo.s -o elf-demo.o` and `ld -Ttext=0x1000 -e _start -o elf-demo.elf elf-demo.o`.
 
 ## Restrictions
-Rejects `ET_DYN`, `PT_INTERP`, `PT_DYNAMIC`, `PT_TLS`, overlapping segments and too many headers. Other non-load program-header types are ignored; unsupported features are not comprehensively detected, so acceptance does not prove a program can run correctly. No relocations, dynamic linking, process startup ABI, guest system calls, TLS, virtual address translation, dynamic page mapping or actual executable isolation exist. The stack is not populated with argc/argv or auxiliary vectors. R/W/X bits are application-level only. File loading follows host paths and can race with file changes. Allocation exceptions can propagate. Do not run untrusted files.
+Rejects `ET_DYN`, `PT_INTERP`, `PT_DYNAMIC`, `PT_TLS`, overlapping segments and too many headers. Other non-load program-header types are ignored; unsupported features are not comprehensively detected, so acceptance does not prove a program can run correctly. No relocations, dynamic linking, process startup ABI, guest system calls, TLS, hardware virtual-to-physical translation, guest-driven mapping syscalls or actual executable isolation exist. The stack is not populated with argc/argv or auxiliary vectors. R/W/X bits are application-level only. File loading follows host paths and can race with file changes. Allocation exceptions can propagate. Do not run untrusted files.
+
+## Bounded metadata inspection
+`nightfall_cli --inspect-elf FILE` reads the 64-byte ELF header and at most
+128 program headers (56 bytes each) from a regular host file. It reports file
+size, ELF type, machine, OSABI, entry and program headers, without loading
+segments or executing code. It accepts only little-endian ELF64 metadata; it
+does not decrypt or process protected formats. A successful inspection is
+**not** a compatibility or safety verdict. File paths are not sandboxed and
+the file can change between reads.
+
+The separate `--run-elf-sparse` mode loads only original trusted unprotected
+test ELFs, with bounded sparse guest memory. It does not implement the PS5
+loader or support games. See MEMORY_ARCHITECTURE.md for limits.

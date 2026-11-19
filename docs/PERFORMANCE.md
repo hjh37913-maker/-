@@ -45,3 +45,11 @@ One unpinned Linux x86-64 GCC 12.2 Release run of `cpu32_benchmark` executed one
 
 ## CPU 32-bit data-memory experiment
 One unpinned Linux x86-64 GCC 12.2 Release run of `cpu32_memory_benchmark` executed one million interpreted 32-bit MOV store/load pairs with host RIP reset in 72,881,355 ns, or 72.8814 ns per pair. It includes synthetic guest permission checks; this is one measurement, not a PS5 or game performance claim.
+
+## Software triangle reference
+One Linux x86-64 GCC 12.2 Release run of `graphics_triangle_benchmark` cleared
+a 320×180 RGBA8 buffer and rasterized one clipped flat-color triangle for
+1,000 batches in 64,631,950 ns, or 64,631.9 ns/batch. This was an unpinned,
+single sample taken while a separate CPU soak test was running, so it is not a
+controlled performance comparison. It is CPU-only, excludes depth, GPU,
+shaders and console workloads, and is not a game frame-rate estimate.

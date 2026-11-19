@@ -93,3 +93,17 @@ Implemented a browser-based library of metadata and optional HTTPS source links;
 
 ## Platform demo builds
 Cross-compiled a native Windows x64 GUI demo linked to the actual synthetic CPU core, and packaged a separate optional browser dashboard with the Windows CLI. Built and debug-signed an offline Android WebView **UI-only** APK with no emulator core. PE headers, APK signature, alignment and manifest were checked; Linux CTest passed 51/51 in Debug, Release and ASan/UBSan. Android generated asset offline/disabled-execution checks passed in jsdom. Neither Windows runtime nor Android install/device/browser behavior was tested; no PS5 or GTA VI support. See DEMO_BUILDS.md.
+
+## 30-minute engineering batch (2026-11-19)
+Added selected 32/64-bit SHL/SHR/SAR, INC/DEC, NOT/NEG, and 16-bit MOV
+forms with original test programs and native/portable checks. Implemented
+bounded, byte-permission sparse guest pages, integrated them into the ELF test
+loader, and executed an original test ELF above 4 GiB using the new optional
+CLI mode. Added bounded metadata-only inspection for unprotected ELF64.
+Implemented independent CPU triangle and depth-buffer experiments with PPM
+demos and software-reference tests. All 90 CTest tests passed in each Linux
+Debug, Release and ASan/UBSan configuration. A separate long-running native
+shift oracle uses a fixed binary snapshot and varied deterministic seeds;
+see its recorded result for actual duration and scope. Windows x64 CLI and
+portable tests were cross-compiled but not run. These experiments do not
+implement the console OS, a PS5 loader, graphics driver, PS5 games, or GTA VI.

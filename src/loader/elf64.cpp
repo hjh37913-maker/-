@@ -19,6 +19,7 @@ const char* elf_status_name(ElfStatus status) noexcept {
     case ElfStatus::unsupported: return "unsupported";
     case ElfStatus::range_error: return "range_error";
     case ElfStatus::overlap: return "overlap";
+    case ElfStatus::resource_limit: return "resource_limit";
     case ElfStatus::no_executable_entry: return "no_executable_entry";
     }
     return "unknown";
@@ -32,7 +33,7 @@ ElfStatus load_elf64(std::span<const std::uint8_t> file, Machine& machine,
     const auto ehsize=le(file,52,2), entsize=le(file,54,2), count=le(file,56,2);
     if (ehsize!=64 || entsize!=56 || !count || count>128 || !fits(phoff,count*56,file.size())) return ElfStatus::malformed;
     if (!stack_size || !fits(stack_base,stack_size,machine.memory.size())) return ElfStatus::range_error;
-    Memory staged(machine.memory.size(),false);
+    Memory staged=machine.memory.is_sparse() ? Memory(machine.memory.size(),SparsePages{machine.memory.max_pages()}) : Memory(machine.memory.size(),false);
     unsigned loads=0;
     for (std::uint64_t i=0;i<count;++i) {
         const auto at=static_cast<std::size_t>(phoff+i*56);
@@ -45,7 +46,9 @@ ElfStatus load_elf64(std::span<const std::uint8_t> file, Machine& machine,
         if (align>1 && ((align & (align-1)) || ((address^offset)&(align-1)))) return ElfStatus::malformed;
         if (!memsz) continue;
         if (!fits(address,memsz,staged.size())) return ElfStatus::range_error;
-        if (!staged.map(address,static_cast<std::size_t>(memsz),Permission::read | Permission::write)) return ElfStatus::overlap;
+        const auto mapped=staged.map_detailed(address,static_cast<std::size_t>(memsz),Permission::read | Permission::write);
+        if (mapped==MapStatus::resource_limit) return ElfStatus::resource_limit;
+        if (mapped!=MapStatus::ok) return ElfStatus::overlap;
         if (filesz && !staged.write(address,file.subspan(static_cast<std::size_t>(offset),static_cast<std::size_t>(filesz)))) return ElfStatus::malformed;
         Permission perm=Permission::none;
         if (flags&4) perm=perm | Permission::read;
@@ -55,7 +58,9 @@ ElfStatus load_elf64(std::span<const std::uint8_t> file, Machine& machine,
         ++loads;
     }
     if (!loads) return ElfStatus::malformed;
-    if (!staged.map(stack_base,stack_size,Permission::read | Permission::write)) return ElfStatus::overlap;
+    const auto stack_status=staged.map_detailed(stack_base,stack_size,Permission::read | Permission::write);
+    if (stack_status==MapStatus::resource_limit) return ElfStatus::resource_limit;
+    if (stack_status!=MapStatus::ok) return ElfStatus::overlap;
     std::array<std::uint8_t,1> probe{};
     if (!staged.fetch(entry,probe)) return ElfStatus::no_executable_entry;
     machine.memory=std::move(staged);

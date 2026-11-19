@@ -7,3 +7,20 @@
 
 ## Research still needed
 RDNA 2 branding is not a public specification of the console's command protocol. Compare Vulkan's explicit queues and synchronization with Direct3D 12 on Windows using original workloads, but neither translates console commands automatically. Guest command formats, shaders, resource binding, coherency, queues, texture formats, synchronization, CPU/GPU integration and PS5 compatibility are unimplemented. No graphics hardware was available in this environment.
+
+## Triangle and depth software experiments
+`Surface` supports constant-color clipped triangles with integer vertices,
+pixel-center sampling and the top-left fill rule. Bounds [-32768,32767]
+keep integer edge calculations safe; invalid batches leave the image unchanged.
+`DepthSurface` separately implements flat-color triangles and a 16-bit affine
+depth buffer with strict LESS testing, rounded depth interpolation, explicit
+clear and the same coverage rules. It has no shaders, interpolation of vertex
+colors, texture sampling, perspective correction, GPU backend, console command
+translation or PS5 compatibility. Its explicit pixel limit bounds allocation;
+it is single-threaded and is not a security boundary.
+
+`nightfall_depth_demo output.ppm` produces an original, overlapping-triangle
+image on the CPU. Tests cover edge ownership, clipping, order, depth
+interpolation, transactional rejection, 10,000 triangle reference cases and
+2,000 randomized multi-triangle scenes against a full-surface software model.
+These are software comparisons, not an independent GPU conformance test.

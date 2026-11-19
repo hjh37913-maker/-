@@ -39,7 +39,7 @@ int main() {
   { const std::array<std::uint8_t,7> code{0x48,0xff,0x25,57,0,0,0}; for(unsigned n=1;n<code.size();++n) { Memory m(n); Cpu c; CHECK(m.write(0,std::span(code).first(n))); c.state.rax=42;
     CHECK(c.step(m)==StepResult::memory_fault && c.state.rip==0 && c.state.rax==42); } }
   // Other FF group extensions remain unsupported.
-  for(unsigned ext : {0u,1u,3u,5u,7u}) { Memory m(2); Cpu c; const std::array<std::uint8_t,2> code{0xff,static_cast<std::uint8_t>(0xc0|(ext<<3))}; CHECK(m.write(0,code));
+  for(unsigned ext : {3u,5u,7u}) { Memory m(2); Cpu c; const std::array<std::uint8_t,2> code{0xff,static_cast<std::uint8_t>(0xc0|(ext<<3))}; CHECK(m.write(0,code));
     CHECK(c.step(m)==StepResult::invalid_instruction && c.state.rip==0); }
   std::cout << count << " indirect control/stack register scenarios passed, plus memory and fault checks\n";
 }

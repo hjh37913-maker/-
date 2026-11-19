@@ -67,3 +67,17 @@ npm install --prefix /tmp/nightfall-ui-test jsdom@26 --no-audit --no-fund
 NODE_PATH=/tmp/nightfall-ui-test/node_modules node tests/web/ui_smoke.cjs
 ```
 The first Release run of the server integration test encountered a BrokenPipe race while sending an oversized body that the server correctly rejected early. The size preflight test was corrected to send headers without a body, and Debug, Release and ASan/UBSan suites all passed afterward. No existing assertions were removed. UI behavior on Windows and in a real browser was not verified.
+
+## Later sparse-memory, CPU and graphics batch (2026-11-19)
+Linux x86-64 GCC 12.2: all 90 registered tests passed in Debug, Release and
+combined ASan/UBSan. Sparse memory was compared against the existing flat
+backend over 200,000 operations; this checks equivalence, not an independent
+hardware oracle. High-address CPU and ELF tests use original synthetic HLT
+programs. Shift, INC/DEC, NOT/NEG, and 16-bit MOV have separate Linux native
+oracles; some use equivalent register instructions rather than the exact
+immediate encoding or guest address. Triangle and depth tests compare to a
+full-surface software model; they are not GPU conformance tests. Tests exercise
+resource-limit and fault atomicity but do not force host allocation failures.
+Windows x64 cross-compilation was checked, but Windows runtime was unavailable.
+See the soak result JSON for the scope and exact duration of the separately
+running shift stress check. No real games or console services were tested.

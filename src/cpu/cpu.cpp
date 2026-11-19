@@ -118,6 +118,32 @@ void group_logical64(CpuState& state, std::uint64_t& dst, std::uint64_t rhs, uns
     if (extension==1) dst|=rhs; else if (extension==4) dst&=rhs; else dst^=rhs;
     logical_test(state,dst);
 }
+// SHL/SHR/SAR: undefined AF and OF for counts greater than one are
+// preserved in this model. Counts have already been masked to 5/6 bits.
+std::uint64_t shift_value(CpuState& state, std::uint64_t operand, unsigned width, unsigned extension, unsigned count) {
+    const auto mask=width==32 ? 0xffffffffULL : ~std::uint64_t{0};
+    const auto lhs=operand & mask;
+    if (!count) return lhs;
+    std::uint64_t result=0;
+    bool carry=false;
+    if (extension==4) { carry=(lhs>>(width-count))&1; result=(lhs<<count)&mask; }
+    else {
+        carry=(lhs>>(count-1))&1; result=lhs>>count;
+        if (extension==7 && ((lhs>>(width-1))&1)) result|=mask ^ (mask>>count);
+    }
+    constexpr std::uint64_t CF=1ULL, PF=1ULL<<2, ZF=1ULL<<6, SF=1ULL<<7, OF=1ULL<<11;
+    std::uint64_t flags=carry?CF:0;
+    if ((std::popcount(static_cast<unsigned>(result&0xff))&1)==0) flags|=PF;
+    if (!result) flags|=ZF;
+    if ((result>>(width-1))&1) flags|=SF;
+    auto update=CF|PF|ZF|SF;
+    if (count==1) {
+        update|=OF;
+        if (extension==4 ? bool((result>>(width-1))&1)!=carry : extension==5 && ((lhs>>(width-1))&1)) flags|=OF;
+    }
+    state.rflags=(state.rflags&~update)|flags;
+    return result;
+}
 }
 StepResult Cpu::step(Memory& memory) {
     std::array<std::uint8_t, 15> b{};
@@ -125,6 +151,54 @@ StepResult Cpu::step(Memory& memory) {
     if (b[0] == 0x90 || b[0] == 0xf4) {
         ++state.rip;
         return b[0] == 0xf4 ? StepResult::halted : StepResult::running;
+    }
+    // Operand-size override MOV: word register/memory/immediate forms.
+    // Only one optional REX prefix after 66 is supported. REX.W overrides
+    // 66 in x86; that combination is deliberately rejected here.
+    if (b[0]==0x66) {
+        if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        const bool has_rex=b[1]>=0x40 && b[1]<=0x4f;
+        const auto rex=has_rex?b[1]:std::uint8_t{0}; const unsigned op_pos=has_rex?2:1;
+        if (has_rex && !memory.fetch(state.rip,std::span(b).first(3))) return StepResult::memory_fault;
+        if (rex&8) return StepResult::invalid_instruction;
+        const auto op=b[op_pos];
+        auto write_word=[&](unsigned index,std::uint16_t value) {
+            auto& target=*state.reg(index); target=(target&~std::uint64_t{0xffff})|value;
+        };
+        if (op>=0xb8 && op<=0xbf) {
+            const unsigned length=op_pos+3;
+            if (!memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
+            write_word(op-0xb8+((rex&1)?8:0),static_cast<std::uint16_t>(little(b.data()+op_pos+1,2)));
+            state.rip+=length; return StepResult::running;
+        }
+        if (op==0x89 || op==0x8b || op==0xc7) {
+            const unsigned modrm_pos=op_pos+1;
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned mod=b[modrm_pos]>>6, low_reg=(b[modrm_pos]>>3)&7;
+            const unsigned reg=low_reg+((rex&4)?8:0), rm=(b[modrm_pos]&7)+((rex&1)?8:0);
+            if (op==0xc7 && low_reg!=0) return StepResult::invalid_instruction;
+            unsigned length=modrm_pos+1; const unsigned trailing=op==0xc7?2:0;
+            if (mod==3) {
+                length+=trailing;
+                if (trailing && !memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
+                const auto value=op==0xc7?static_cast<std::uint16_t>(little(b.data()+length-2,2)):
+                                 static_cast<std::uint16_t>(*state.reg(op==0x8b?rm:reg));
+                write_word(op==0x8b?reg:rm,value);
+            } else {
+                std::uint64_t address=0;
+                if (!effective_address(memory,state,b,modrm_pos,rex,trailing,address,length)) return StepResult::memory_fault;
+                if (op==0x8b) {
+                    std::array<std::uint8_t,2> data{}; if (!memory.read(address,data)) return StepResult::memory_fault;
+                    write_word(reg,static_cast<std::uint16_t>(little(data.data(),2)));
+                } else {
+                    auto value=op==0xc7?static_cast<std::uint16_t>(little(b.data()+length-2,2)):static_cast<std::uint16_t>(*state.reg(reg));
+                    const std::array<std::uint8_t,2> data{static_cast<std::uint8_t>(value),static_cast<std::uint8_t>(value>>8)};
+                    if (!memory.write(address,data)) return StepResult::memory_fault;
+                }
+            }
+            state.rip+=length; return StepResult::running;
+        }
+        return StepResult::invalid_instruction;
     }
     // MOVZX/MOVSX r32/r64, r/m8 or r/m16, and MOVSXD r64, r/m32.
     // Any REX prefix replaces AH..BH with SPL..DIL for byte sources.
@@ -213,6 +287,71 @@ StepResult Cpu::step(Memory& memory) {
             state.rip+=length; return StepResult::running;
         }
     }
+    // F7 /2 NOT and /3 NEG on r/m32 or r/m64. NOT preserves all flags.
+    if (b[0]==0xf7 || (b[0]>=0x40 && b[0]<=0x4f)) {
+        const bool has_rex=b[0]>=0x40 && b[0]<=0x4f;
+        const auto rex=has_rex?b[0]:std::uint8_t{0}; const unsigned op_pos=has_rex?1:0;
+        if (has_rex && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        if (b[op_pos]==0xf7) {
+            const unsigned modrm_pos=op_pos+1;
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned mod=b[modrm_pos]>>6, ext=(b[modrm_pos]>>3)&7, rm=(b[modrm_pos]&7)+((rex&1)?8:0);
+            if (ext!=2 && ext!=3) return StepResult::invalid_instruction;
+            const unsigned width=(rex&8)?64:32; unsigned length=modrm_pos+1; std::uint64_t address=0, value=0;
+            if (mod==3) value=*state.reg(rm);
+            else {
+                if (!effective_address(memory,state,b,modrm_pos,rex,0,address,length)) return StepResult::memory_fault;
+                std::array<std::uint8_t,8> bytes{};
+                if (!memory.read(address,std::span(bytes).first(width/8))) return StepResult::memory_fault;
+                value=little(bytes.data(),width/8);
+            }
+            auto next=state;
+            if (ext==2) value=width==32 ? std::uint32_t(~value) : ~value;
+            else {
+                const auto operand=value; value=0;
+                if (width==32) arithmetic32(next,value,static_cast<std::uint32_t>(operand),true,false);
+                else arithmetic(next,value,operand,true,false);
+            }
+            if (mod==3) *next.reg(rm)=value;
+            else { const auto bytes=bytes64(value); if (!memory.write(address,std::span(bytes).first(width/8))) return StepResult::memory_fault; }
+            state=next; state.rip+=length; return StepResult::running;
+        }
+    }
+    // Group-2 SHL/SHR/SAR r/m32,r/m64, counts 1, CL or immediate byte.
+    if (b[0]==0xd1 || b[0]==0xd3 || b[0]==0xc1 || (b[0]>=0x40 && b[0]<=0x4f)) {
+        const bool has_rex=b[0]>=0x40 && b[0]<=0x4f;
+        const auto rex=has_rex?b[0]:std::uint8_t{0}; const unsigned op_pos=has_rex?1:0;
+        if (has_rex && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        const auto op=b[op_pos];
+        if (op==0xd1 || op==0xd3 || op==0xc1) {
+            const unsigned modrm_pos=op_pos+1;
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned mod=b[modrm_pos]>>6, extension=(b[modrm_pos]>>3)&7, rm=b[modrm_pos]&7;
+            if (extension!=4 && extension!=5 && extension!=7) return StepResult::invalid_instruction;
+            const unsigned width=(rex&8)?64:32, trailing=op==0xc1?1:0;
+            unsigned length=modrm_pos+1; std::uint64_t address=0, value=0;
+            if (mod==3) {
+                length+=trailing;
+                if (trailing && !memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
+                value=*state.reg(rm+((rex&1)?8:0));
+            } else {
+                if (!effective_address(memory,state,b,modrm_pos,rex,trailing,address,length)) return StepResult::memory_fault;
+                std::array<std::uint8_t,8> data{};
+                if (!memory.read(address,std::span(data).first(width/8))) return StepResult::memory_fault;
+                value=little(data.data(),width/8);
+            }
+            // CL is read before any destination register is updated, even when it aliases RCX.
+            const unsigned raw_count=op==0xd1?1:op==0xd3?static_cast<unsigned>(*state.reg(1)&0xff):b[length-1];
+            const unsigned count=raw_count & (width==64?63:31);
+            auto next=state; const auto result=shift_value(next,value,width,extension,count);
+            if (mod==3) *next.reg(rm+((rex&1)?8:0))=result;
+            else {
+                const auto data=bytes64(result);
+                if (!memory.write(address,std::span(data).first(width/8))) return StepResult::memory_fault;
+            }
+            state=next; state.rip+=length; return StepResult::running;
+        }
+    }
     // Near indirect CALL/JMP and PUSH r/m64 (FF /2, /4, /6).
     // Evaluate memory/register operands before changing RSP, including [rsp].
     const bool rex_indirect=b[0]>=0x40 && b[0]<=0x4f;
@@ -223,8 +362,27 @@ StepResult Cpu::step(Memory& memory) {
             const unsigned modrm_pos=op_pos+1;
             if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
             const unsigned mod=b[modrm_pos]>>6, extension=(b[modrm_pos]>>3)&7;
-            if (extension!=2 && extension!=4 && extension!=6) return StepResult::invalid_instruction;
             const std::uint8_t rex=rex_indirect?b[0]:0;
+            // FF /0 and /1: INC/DEC r/m32 or REX.W r/m64. CF is preserved.
+            if (extension==0 || extension==1) {
+                const unsigned width=(rex&8)?64:32, rm=(b[modrm_pos]&7)+((rex&1)?8:0);
+                unsigned length=modrm_pos+1; std::uint64_t address=0, value=0;
+                if (mod==3) value=*state.reg(rm);
+                else {
+                    if (!effective_address(memory,state,b,modrm_pos,rex,0,address,length)) return StepResult::memory_fault;
+                    std::array<std::uint8_t,8> bytes{};
+                    if (!memory.read(address,std::span(bytes).first(width/8))) return StepResult::memory_fault;
+                    value=little(bytes.data(),width/8);
+                }
+                auto next=state;
+                if (width==64) arithmetic(next,value,1,extension==1,false);
+                else arithmetic32(next,value,1,extension==1,false);
+                next.rflags=(next.rflags&~std::uint64_t{1})|(state.rflags&1);
+                if (mod==3) *next.reg(rm)=value;
+                else { const auto bytes=bytes64(value); if (!memory.write(address,std::span(bytes).first(width/8))) return StepResult::memory_fault; }
+                state=next; state.rip+=length; return StepResult::running;
+            }
+            if (extension!=2 && extension!=4 && extension!=6) return StepResult::invalid_instruction;
             unsigned length=modrm_pos+1; std::uint64_t operand=0;
             if (mod==3) operand=*state.reg((b[modrm_pos]&7)+((rex&1)?8:0));
             else {

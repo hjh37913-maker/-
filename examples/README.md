@@ -86,3 +86,15 @@ checked-in ELF. The integration test checks both the return value and the
 three guest-memory output bytes. Build with the freestanding flags above.
 These files contain synthetic HLT and **must not be executed on the host**.
 They are original test programs, not PS5 software.
+
+## Shifts, word transfers and sparse-address fixtures
+`shift-demo.elf` uses CL-driven shifts; `inc-dec-demo.elf` and
+`not-neg-demo.elf` use explicit inline x86 instructions; `mov16-demo.elf`
+transfers a 16-bit value. Each original freestanding program stops at the
+interpreter's synthetic HLT with RAX=42. Build using the GCC flags above.
+`high-address-demo.elf` is assembled from the included source at guest address
+0x100000000; build using `as --64 examples/high-address-demo.s -o high.o` and
+`ld -Ttext=0x100000000 -e _start --build-id=none -o high.elf high.o`. On a
+64-bit host, `nightfall_cli --run-elf-sparse high.elf 5` stops with RAX=42.
+These programs contain synthetic HLT and **must not be run on the host**. No
+PS5 ABI or real game software is exercised.

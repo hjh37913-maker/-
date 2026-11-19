@@ -17,6 +17,7 @@ struct RunReport {
 class Machine {
 public:
     explicit Machine(std::size_t memory_size) : memory(memory_size) {}
+    Machine(std::size_t memory_size, SparsePages sparse) : memory(memory_size,sparse) {}
     RunResult run(std::size_t instruction_budget);
     RunReport run_detailed(std::size_t instruction_budget);
     Memory memory;

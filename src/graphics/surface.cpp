@@ -40,6 +40,9 @@ bool Surface::execute(std::span<const Command> commands) noexcept {
             if (!within(f->x,f->y,f->width,f->height)) return false;
         } else if (const auto* c=std::get_if<Copy>(&command)) {
             if (!within(c->sx,c->sy,c->width,c->height) || !within(c->dx,c->dy,c->width,c->height)) return false;
+        } else if (const auto* t=std::get_if<Triangle>(&command)) {
+            const auto valid=[](Point p) { return p.x>=-32768 && p.x<=32767 && p.y>=-32768 && p.y<=32767; };
+            if (!valid(t->a) || !valid(t->b) || !valid(t->c)) return false;
         } else if (!std::holds_alternative<Clear>(command)) return false;
     }
     for (const auto& command : commands) {
@@ -49,6 +52,27 @@ bool Surface::execute(std::span<const Command> commands) noexcept {
             if (!f->width || !f->height) continue;
             for (std::uint32_t y=0; y<f->height; ++y)
                 std::fill_n(pixels_.begin()+static_cast<std::size_t>(f->y+y)*width_+f->x,f->width,f->color);
+        } else if (const auto* t=std::get_if<Triangle>(&command)) {
+            auto a=t->a, b=t->b, c=t->c;
+            // Twice-coordinate sample space places pixel centers at odd integers.
+            const auto edge=[](Point p, Point q, std::int64_t x, std::int64_t y) {
+                return (std::int64_t(q.x)-p.x)*(y-2*std::int64_t(p.y)) -
+                       (std::int64_t(q.y)-p.y)*(x-2*std::int64_t(p.x));
+            };
+            auto area=edge(a,b,2*std::int64_t(c.x),2*std::int64_t(c.y));
+            if (!area) continue;
+            if (area<0) std::swap(b,c);
+            const auto inclusive=[](Point p, Point q) { return q.y<p.y || (q.y==p.y && q.x>p.x); };
+            const auto x0=std::max<std::int64_t>(0,std::min({a.x,b.x,c.x}));
+            const auto y0=std::max<std::int64_t>(0,std::min({a.y,b.y,c.y}));
+            const auto x1=std::min<std::int64_t>(width_,std::max({a.x,b.x,c.x}));
+            const auto y1=std::min<std::int64_t>(height_,std::max({a.y,b.y,c.y}));
+            for (auto y=y0;y<y1;++y) for (auto x=x0;x<x1;++x) {
+                const auto e0=edge(a,b,2*x+1,2*y+1), e1=edge(b,c,2*x+1,2*y+1), e2=edge(c,a,2*x+1,2*y+1);
+                if ((e0>0 || (e0==0 && inclusive(a,b))) && (e1>0 || (e1==0 && inclusive(b,c))) &&
+                    (e2>0 || (e2==0 && inclusive(c,a))))
+                    pixels_[static_cast<std::size_t>(y)*width_+static_cast<std::size_t>(x)]=t->color;
+            }
         } else if (const auto* c=std::get_if<Copy>(&command)) {
             if (!c->width || !c->height) continue;
             static_assert(std::is_trivially_copyable_v<Pixel>);
