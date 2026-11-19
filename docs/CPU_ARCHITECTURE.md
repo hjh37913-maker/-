@@ -212,7 +212,7 @@ immediate-group forms now also accept REX prefixes with W=0. REX.R/B extend
 register operands and REX.X/B extend effective address components; register
 writes zero-extend. Compare and TEST retain their input registers. Faulting
 memory RMW operations stage flags and destination values before write.
-`0F 1F /0` multi-byte NOP accepts one optional `66` and one optional REX,
+`66 90` and `0F 1F /0` multi-byte NOP are supported. The latter accepts one optional `66` and one optional REX,
 decodes ModRM/SIB/displacements but does not read the computed data address.
 Other prefix combinations and unsupported instruction forms are not implied.
 

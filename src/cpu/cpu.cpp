@@ -236,6 +236,11 @@ StepResult Cpu::step(Memory& memory) {
         ++state.rip;
         return b[0] == 0xf4 ? StepResult::halted : StepResult::running;
     }
+    // Two-byte operand-size-prefixed NOP (XCHG AX, AX).
+    if(b[0]==0x66) {
+        if(!fetch(2)) return StepResult::memory_fault;
+        if(b[1]==0x90) { state.rip+=2; return StepResult::running; }
+    }
     // CLD/STD modify only the direction flag.
     if(b[0]==0xfc || b[0]==0xfd) {
         if(b[0]==0xfc) state.rflags&=~(1ULL<<10); else state.rflags|=1ULL<<10;

@@ -34,5 +34,7 @@ int main() {
    CHECK(c.step(m)==StepResult::running && c.state.rip==8 && c.state.rax==UINT64_MAX && c.state.rflags==0x8d7);
    for(unsigned n=1;n<op.size();++n){Memory t(n);Cpu d;CHECK(t.write(0,std::span(op).first(n))); d.state.rax=3;CHECK(d.step(t)==StepResult::memory_fault && d.state.rip==0 && d.state.rax==3);} }
  { Memory m(4); Cpu c; const std::array<std::uint8_t,4> op{0x0f,0x1f,0xc8,0}; CHECK(m.write(0,op)); CHECK(c.step(m)==StepResult::invalid_instruction && c.state.rip==0); }
+ { Memory m(16); Cpu c; const std::array<std::uint8_t,2> op{0x66,0x90}; CHECK(m.write(0,op)); c.state.rax=0x123456789abcdef0ULL; c.state.rflags=0x8d7;
+   CHECK(c.step(m)==StepResult::running && c.state.rip==2 && c.state.rax==0x123456789abcdef0ULL && c.state.rflags==0x8d7); }
  std::cout<<cases<<" REX32 and unprefixed register equivalence cases, plus address and NOP tests passed\n";
 }

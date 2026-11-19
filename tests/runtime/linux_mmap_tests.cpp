@@ -15,6 +15,11 @@ int main() {
  { Machine m(0x10000,SparsePages{9}); CHECK(m.memory.map(0,page,Permission::read|Permission::write|Permission::execute)&&m.memory.write(0,code)); LinuxProcess p(m);
    CHECK(!p.configure_mmap(3,limit)&&!p.configure_mmap(base,limit+1)&&!p.configure_mmap(0,0x500000)&&p.configure_mmap(base,limit)&&!p.configure_mmap(base,limit));
    CHECK(call(p,m,9,0,0,3,0x22,UINT64_MAX)==inval);
+   CHECK(call(p,m,9,0,UINT64_MAX,3,0x22,UINT64_MAX)==inval);
+   CHECK(call(p,m,9,0,1,8,0x22,UINT64_MAX)==inval);
+   CHECK(call(p,m,9,0,1,3,0x22,UINT64_MAX,UINT64_MAX)==inval);
+   CHECK(call(p,m,10,UINT64_MAX,1,3)==inval);
+   CHECK(call(p,m,11,base,UINT64_MAX)==inval);
    CHECK(call(p,m,9,0,1,3,0x20,UINT64_MAX)==inval);
    CHECK(call(p,m,9,1,1,3,0x22,UINT64_MAX)==inval);
    CHECK(call(p,m,9,0,1,3,0x22,3)==inval);

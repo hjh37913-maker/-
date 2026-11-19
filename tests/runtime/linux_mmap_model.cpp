@@ -14,7 +14,7 @@ struct Page {bool owned=false,external=false;unsigned perm=0;std::uint8_t value=
 int main() {
  constexpr std::uint64_t base=0x4000,page=4096,nomem=std::uint64_t{0}-12;
  std::uint64_t seed=0x98cbd7512a0fe415ULL;unsigned cases=0;
- for(unsigned scene=0;scene<50;++scene) {
+ for(unsigned scene=0;scene<250;++scene) {
   Machine m(0x10000,SparsePages{16});const std::array<std::uint8_t,2> code{0x0f,0x05};
   if(!m.memory.map(0,page,Permission::read|Permission::write|Permission::execute)||!m.memory.write(0,code))return 1;
   std::array<Page,8> model{};const unsigned foreign=next(seed)%8;

@@ -4,7 +4,7 @@ import platform
 import subprocess
 import sys
 
-cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions, strings, compiled_hash, compiled_vector, mmap_elf = sys.argv[1:]
+cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions, strings, compiled_hash, compiled_vector, mmap_elf, compiled_alloc = sys.argv[1:]
 def guest(file, budget='100', *argv):
     return subprocess.run([cli, '--run-linux-elf', file, budget, *argv], capture_output=True)
 q=guest(hello)
@@ -72,11 +72,12 @@ for size in range(71):
     h=2166136261
     for byte in sample[:64]: h=((h^byte)*16777619)&0xffffffff
     expected=f'{h:08x}\n'.encode()
-    q=subprocess.run([cli,'--run-linux-elf-stdin',compiled_hash,'2000'],input=sample,capture_output=True)
-    assert q.returncode==0 and q.stdout==expected, (size,q.returncode,q.stdout,q.stderr)
-    if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
-        native=subprocess.run([compiled_hash],input=sample,capture_output=True)
-        assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+    for binary in (compiled_hash,compiled_alloc):
+        q=subprocess.run([cli,'--run-linux-elf-stdin',binary,'2000'],input=sample,capture_output=True)
+        assert q.returncode==0 and q.stdout==expected, (binary,size,q.returncode,q.stdout,q.stderr)
+        if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
+            native=subprocess.run([binary],input=sample,capture_output=True)
+            assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
 q=guest(strings)
 assert q.returncode==0 and q.stdout==b'String OK\n', (q.returncode,q.stdout,q.stderr)
 if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):

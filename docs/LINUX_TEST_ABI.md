@@ -60,9 +60,11 @@ separate bounded software model (not an independent native oracle). On Linux
 x86-64, private-pipe comparisons exercise 8,192 generated cases per basic
 read, write, readv and writev oracle; original Linux ELF examples are compared
 with native output and exit where applicable. These are finite test cases, not
-proof of full syscall compatibility. A further 10,000 mmap arena operations
+proof of full syscall compatibility. A further 50,000 mmap arena operations
 are compared with a separate bounded software model, and 1,024 selected cases
 with native Linux private anonymous mappings; neither covers real game ABIs.
+An additional compiled C fixture combines anonymous allocation, input,
+read-only protection, hashing, output and unmapping.
 The long-running write soak repeatedly
 executes the frozen native oracle; its detailed result is recorded separately.
 Windows x64 was cross-compiled, not runtime tested.
