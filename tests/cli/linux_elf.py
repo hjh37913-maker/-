@@ -4,7 +4,7 @@ import platform
 import subprocess
 import sys
 
-cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions, strings, compiled_hash, compiled_vector = sys.argv[1:]
+cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault, carry, conditions, strings, compiled_hash, compiled_vector, mmap_elf = sys.argv[1:]
 def guest(file, budget='100', *argv):
     return subprocess.run([cli, '--run-linux-elf', file, budget, *argv], capture_output=True)
 q=guest(hello)
@@ -44,6 +44,11 @@ q=guest(multiply)
 assert q.returncode==0 and q.stdout==b'Multiply OK\n', (q.returncode,q.stdout,q.stderr)
 if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
     native=subprocess.run([multiply],capture_output=True)
+    assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+q=guest(mmap_elf)
+assert q.returncode==0 and q.stdout==b'M', (q.returncode,q.stdout,q.stderr)
+if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
+    native=subprocess.run([mmap_elf],capture_output=True)
     assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
 # GCC-compiled SSE2 integer vector fixture; short input exits without output.
 for size in range(65):

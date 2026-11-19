@@ -17,7 +17,8 @@ stdin mode, reads host standard input.
   `AT_NULL` only; it is not a complete Linux auxiliary vector. Arguments are
   bounded, and the initial stack pointer is aligned to 16 bytes.
 * Syscalls: buffered `read`/`readv` from fd 0, buffered `write`/`writev` to
-  fd 1 or 2, a bounded page-mapped synthetic `brk`, and `exit`/`exit_group`.
+  fd 1 or 2, a bounded page-mapped synthetic `brk`, a constrained anonymous
+  `mmap`/`mprotect`/`munmap` arena, and `exit`/`exit_group`.
   Other syscalls return `-ENOSYS`. Counts, memory, I/O, argument strings and
   execution are bounded. In particular the combined output limit is a project
   constraint, and `readv` validates touched ranges before mutation; edge cases
@@ -54,11 +55,14 @@ The examples are self-authored static fixtures, not PlayStation software.
 
 `./scripts/verify.sh` runs the full CTest suite in Linux Debug, Release and
 ASan+UBSan configurations. Portable tests cover syscall and stack boundaries,
-heap, vector I/O, instruction budgets, and 50,000 stateful steps against a
+heap, mmap ownership, vector I/O, execution budgets, and 50,000 stateful steps against a
 separate bounded software model (not an independent native oracle). On Linux
 x86-64, private-pipe comparisons exercise 8,192 generated cases per basic
 read, write, readv and writev oracle; original Linux ELF examples are compared
 with native output and exit where applicable. These are finite test cases, not
-proof of full syscall compatibility. The long-running write soak repeatedly
+proof of full syscall compatibility. A further 10,000 mmap arena operations
+are compared with a separate bounded software model, and 1,024 selected cases
+with native Linux private anonymous mappings; neither covers real game ABIs.
+The long-running write soak repeatedly
 executes the frozen native oracle; its detailed result is recorded separately.
 Windows x64 was cross-compiled, not runtime tested.

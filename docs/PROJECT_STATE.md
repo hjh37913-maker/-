@@ -17,8 +17,16 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 124 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 127 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current bounded anonymous-memory batch
+
+Added a deterministic, bounded anonymous mmap arena with mprotect/munmap for
+test ELFs, portable and native checks, and an original static fixture. Linux
+Debug, Release and ASan+UBSan: 127/127 tests each; Windows x64 cross-compiled
+only. This is not a sandbox or a complete Linux or PS5 memory ABI. See
+LINUX_TEST_ABI.md for strict limits and intentional differences.
 
 ## Current SSE2 integer and fetch-cache batch
 

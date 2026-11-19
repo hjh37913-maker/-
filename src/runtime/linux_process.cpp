@@ -54,12 +54,59 @@ bool LinuxProcess::configure_brk(std::uint64_t base,std::uint64_t limit) {
        limit>machine_.memory.size() || limit-base>max_heap) return false;
     brk_base_=brk_current_=brk_mapped_end_=base; brk_limit_=limit; brk_configured_=true; return true;
 }
+bool LinuxProcess::configure_mmap(std::uint64_t base,std::uint64_t limit) {
+    constexpr std::uint64_t page=4096, max_arena=4*1024*1024;
+    if(started_ || exited_ || mmap_configured_ || base>=limit || (base&(page-1)) || (limit&(page-1)) ||
+       limit>machine_.memory.size() || limit-base>max_arena) return false;
+    mmap_base_=base; mmap_limit_=limit; mmap_configured_=true; return true;
+}
 void LinuxProcess::dispatch() {
     auto& state=machine_.cpu.state;
     const auto number=state.rax, arg0=*state.reg(7), arg1=*state.reg(6), arg2=*state.reg(2);
     // Userspace-observable syscall return registers. Kernel mode and FMASK are not modeled.
     *state.reg(1)=state.rip+2; *state.reg(11)=state.rflags; state.rip+=2;
     if(number==60 || number==231) { exited_=true; exit_code_=static_cast<std::uint8_t>(arg0); return; }
+    if(number==9 || number==10 || number==11) { // bounded anonymous mmap/mprotect/munmap subset
+        if(!mmap_configured_) { state.rax=err(38); return; }
+        constexpr std::uint64_t page=4096, max_map=1024*1024;
+        if(!arg1 || arg1>max_map) { state.rax=err(22); return; }
+        const auto rounded=(arg1+page-1)&~(page-1);
+        const auto pages=static_cast<std::size_t>(rounded/page);
+        const auto arena_pages=static_cast<std::size_t>((mmap_limit_-mmap_base_)/page);
+        if(number==9) {
+            // Only null hint, private anonymous mappings with fd=-1, offset=0.
+            const auto flags=*state.reg(10), fd=*state.reg(8), offset=*state.reg(9);
+            if(arg0 || arg2>7 || flags!=0x22 || static_cast<std::uint32_t>(fd)!=0xffffffffu || offset) { state.rax=err(22); return; }
+            if(pages>arena_pages) { state.rax=err(12); return; }
+            for(std::size_t first=0;first+pages<=arena_pages;++first) {
+                bool occupied=false; for(std::size_t j=0;j<pages;++j) if(mmap_pages_[first+j]) { first+=j; occupied=true; break; }
+                if(occupied) continue;
+                const auto address=mmap_base_+first*page;
+                const auto status=machine_.memory.map_detailed(address,static_cast<std::size_t>(rounded),static_cast<Permission>(arg2));
+                if(status==MapStatus::overlap) continue;
+                if(status!=MapStatus::ok) { state.rax=err(12); return; }
+                for(std::size_t j=0;j<pages;++j) mmap_pages_[first+j]=true;
+                state.rax=address; return;
+            }
+            state.rax=err(12); return;
+        }
+        if((arg0&(page-1)) || arg0<mmap_base_ || arg0>=mmap_limit_ || rounded>mmap_limit_-arg0) { state.rax=err(22); return; }
+        const auto first=static_cast<std::size_t>((arg0-mmap_base_)/page);
+        if(number==10) {
+            if(arg2>7) { state.rax=err(22); return; }
+            for(std::size_t j=0;j<pages;++j) if(!mmap_pages_[first+j]) { state.rax=err(12); return; }
+            if(!machine_.memory.protect(arg0,static_cast<std::size_t>(rounded),static_cast<Permission>(arg2))) { state.rax=err(12); return; }
+            state.rax=0; return;
+        }
+        // Ignore holes inside the arena, but never unmap pages owned by the
+        // loader, heap, or external host-side setup. Validate before mutation.
+        for(std::size_t j=0;j<pages;++j) if(mmap_pages_[first+j] && !machine_.memory.can_access(arg0+j*page,page,Permission::none)) { state.rax=err(12); return; }
+        for(std::size_t j=0;j<pages;++j) if(mmap_pages_[first+j]) {
+            if(!machine_.memory.unmap(arg0+j*page,page)) { state.rax=err(12); return; }
+            mmap_pages_[first+j]=false;
+        }
+        state.rax=0; return;
+    }
     if(number==12) { // brk: bounded synthetic heap, no host memory mapping
         if(!brk_configured_) { state.rax=err(38); return; }
         if(!arg0 || arg0<brk_base_ || arg0>brk_limit_) { state.rax=brk_current_; return; }

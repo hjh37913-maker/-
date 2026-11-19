@@ -114,7 +114,7 @@ int linux_elf(const char* path,std::size_t budget,std::span<const std::string> a
     if(!nightfall::runtime::prepare_linux_stack(machine,virtual_size-stack_size,stack_size,args)) { std::cerr << "Cannot prepare bounded test process stack.\n"; return 1; }
     nightfall::runtime::LinuxProcess process(machine);
     // Fixed test-only heap; overlap with loaded mappings fails safely on brk growth.
-    if(!process.configure_brk(0x80000000ULL,0x80100000ULL)) { std::cerr << "Test heap setup failed.\n"; return 1; }
+    if(!process.configure_brk(0x80000000ULL,0x80100000ULL) || !process.configure_mmap(0x90000000ULL,0x90400000ULL)) { std::cerr << "Test heap/arena setup failed.\n"; return 1; }
 #ifdef _WIN32
     // Captured guest output and explicitly supplied stdin are byte streams.
     if(_setmode(_fileno(stdout),_O_BINARY)==-1 || _setmode(_fileno(stderr),_O_BINARY)==-1 || (read_stdin && _setmode(_fileno(stdin),_O_BINARY)==-1)) {

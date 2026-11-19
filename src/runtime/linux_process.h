@@ -1,5 +1,6 @@
 #pragma once
 #include "core/machine.h"
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -8,7 +9,8 @@
 namespace nightfall::runtime {
 // Tiny Linux x86-64 test ABI, not a Linux/PS5 compatibility layer or sandbox.
 // No guest syscall is forwarded to the host. Only captured stdout/stderr writes
-// bounded stdin, readv/writev, a configured test heap, and process exit are modeled;
+// bounded stdin, readv/writev, a configured test heap/anonymous arena, and
+// process exit are modeled;
 // unknown calls return -ENOSYS.
 enum class ProcessResult { exited, halted, invalid_instruction, memory_fault, budget_exhausted, already_exited, divide_error, alignment_fault };
 struct ProcessReport { ProcessResult result=ProcessResult::budget_exhausted; std::size_t attempted=0; std::uint64_t stop_rip=0; std::uint8_t exit_code=0; };
@@ -25,6 +27,9 @@ public:
     // Bounds must be 4096-byte aligned and fit the guest virtual capacity.
     bool configure_brk(std::uint64_t base,std::uint64_t limit);
     // Budget counts CPU steps, including each element of a REP instruction.
+    // Before execution: enable a page-aligned synthetic anonymous mmap arena,
+    // at most 4 MiB. This is not host mapping or an isolation boundary.
+    bool configure_mmap(std::uint64_t base,std::uint64_t limit);
     ProcessReport run(std::size_t instruction_budget);
     std::span<const std::uint8_t> stdout_bytes() const noexcept { return stdout_; }
     std::span<const std::uint8_t> stderr_bytes() const noexcept { return stderr_; }
@@ -36,6 +41,9 @@ private:
     std::vector<std::uint8_t> stdout_,stderr_,stdin_;
     std::size_t stdin_cursor_=0;
     std::uint64_t brk_base_=0, brk_limit_=0, brk_current_=0, brk_mapped_end_=0;
+    std::uint64_t mmap_base_=0,mmap_limit_=0;
+    std::array<bool,1024> mmap_pages_{};
+    bool mmap_configured_=false;
     bool brk_configured_=false, started_=false,exited_=false;
     std::uint8_t exit_code_=0;
 };
