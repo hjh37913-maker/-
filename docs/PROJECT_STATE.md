@@ -17,8 +17,16 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 155 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 156 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Standalone synthetic diagnostic
+
+`nightfall_sce_service_demo` runs an embedded authored test through the raw
+SCE-style loader and bounded service dispatcher at three biases. Linux Debug,
+Release and ASan+UBSan passed 156/156 tests. Windows executable cross-compiled
+only, not run. This diagnostic cannot load a game or prove PS5 compatibility.
+See `../reports/nightfall-synthetic-demo/WORK_REPORT.md`.
 
 ## Current synthetic guest service experiment
 
