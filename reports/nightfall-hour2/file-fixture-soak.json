@@ -1,0 +1,12 @@
+{
+  "runner_sha256": "95bd8799251d6b11016c21158cfc4603e6ffa9ffd4fe4a610866338b123f7734",
+  "fixture_sha256": "7faa3fb2ee43a3ccce4d793d13374ca26fb13b74755562fa2c6dc9a2b4a5bb44",
+  "driver_sha256": "ef5d91221b1c181876539ee652fa9b8fbc713f01767e6f765bf1844ce63bb0a9",
+  "seed_start": 381000,
+  "batches": 12,
+  "cases_per_batch": 5000,
+  "guest_executions": 60000,
+  "elapsed_seconds": 1101.609,
+  "finished_utc": "2026-11-19T17:26:51.332267+00:00",
+  "scope": "Original compiled file fixture vs Python and, on Linux x86-64, native private temporary files. No games or PS5 software."
+}

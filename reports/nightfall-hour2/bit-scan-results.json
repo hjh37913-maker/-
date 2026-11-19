@@ -1,0 +1,8 @@
+{
+  "batches": 44322,
+  "comparisons": 8714059776,
+  "seconds": 1650.012,
+  "cases_per_batch": 196608,
+  "oracle": "native x86-64 register BSF/BSR defined results and ZF; varying deterministic seeds",
+  "completed_utc": "2026-11-19T17:21:41.621542+00:00"
+}

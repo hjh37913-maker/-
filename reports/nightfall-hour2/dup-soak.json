@@ -1,0 +1,10 @@
+{
+  "binary_sha256": "493519825818680090c5b202f7c27398347efb9d56c382e4e91a56685dd4fa10",
+  "seed_start": 1397411,
+  "batches": 21620,
+  "comparisons_per_batch": 32768,
+  "total_comparisons": 708444160,
+  "elapsed_seconds": 1050.022,
+  "finished_utc": "2026-11-19T17:27:47.327189+00:00",
+  "oracle_output": "32768 stateful open/dup/dup2/close/seek/read comparisons with private Linux memfds passed"
+}
