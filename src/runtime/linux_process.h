@@ -39,7 +39,7 @@ public:
 private:
     enum class FdKind { unused, input, output, error, file };
     struct TestFile { std::string path; std::vector<std::uint8_t> bytes; };
-    struct Descriptor { FdKind kind=FdKind::unused; std::size_t description=0; };
+    struct Descriptor { FdKind kind=FdKind::unused; std::size_t description=0; bool cloexec=false; };
     struct OpenFile { std::size_t file_index=0, references=0; std::uint64_t cursor=0; };
     struct ReadSource { const std::vector<std::uint8_t>* bytes=nullptr; std::uint64_t* cursor=nullptr; };
     void close_descriptor(std::size_t fd) noexcept;

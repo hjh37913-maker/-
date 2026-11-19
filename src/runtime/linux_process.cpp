@@ -126,7 +126,7 @@ void LinuxProcess::dispatch() {
         if(fd==descriptors_.size()) { state.rax=err(24); return; }
         std::size_t slot=0; while(slot<open_files_.size() && open_files_[slot].references) ++slot;
         if(slot==open_files_.size()) { state.rax=err(24); return; }
-        open_files_[slot]={file,1,0}; descriptors_[fd]={FdKind::file,slot}; state.rax=fd; return;
+        open_files_[slot]={file,1,0}; descriptors_[fd]={FdKind::file,slot,bool(flags&0x80000U)}; state.rax=fd; return;
     }
     if(number==3) { // close any modeled descriptor; no host descriptor exists.
         const auto fd=static_cast<std::uint32_t>(arg0);
@@ -148,8 +148,26 @@ void LinuxProcess::dispatch() {
             close_descriptor(target);
         }
         descriptors_[target]=descriptors_[oldfd];
+        descriptors_[target].cloexec=number==292 && (static_cast<std::uint32_t>(arg2)&0x80000U);
         if(descriptors_[target].kind==FdKind::file) ++open_files_[descriptors_[target].description].references;
         state.rax=target; return;
+    }
+    if(number==72) { // narrow fcntl: descriptor flags and duplication only
+        const auto fd=static_cast<std::uint32_t>(arg0), command=static_cast<std::uint32_t>(arg1);
+        if(fd>=descriptors_.size() || descriptors_[fd].kind==FdKind::unused) { state.rax=err(9); return; }
+        if(command==1) { state.rax=descriptors_[fd].cloexec?1:0; return; } // F_GETFD
+        if(command==2) { descriptors_[fd].cloexec=bool(arg2&1); state.rax=0; return; } // F_SETFD
+        if(command==0 || command==1030) { // F_DUPFD / F_DUPFD_CLOEXEC
+            const auto lower=static_cast<std::uint32_t>(arg2);
+            if(lower>=descriptors_.size()) { state.rax=err(22); return; }
+            std::size_t target=lower;
+            while(target<descriptors_.size() && descriptors_[target].kind!=FdKind::unused) ++target;
+            if(target==descriptors_.size()) { state.rax=err(24); return; }
+            descriptors_[target]=descriptors_[fd]; descriptors_[target].cloexec=command==1030;
+            if(descriptors_[target].kind==FdKind::file) ++open_files_[descriptors_[target].description].references;
+            state.rax=target; return;
+        }
+        state.rax=err(22); return; // Other fcntl commands are not modeled.
     }
     if(number==4 || number==5 || number==6 || number==262) { // synthetic x86-64 stat
         std::size_t index=0; std::uint64_t destination=arg1;

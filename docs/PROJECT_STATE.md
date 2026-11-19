@@ -17,8 +17,16 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 138 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 140 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Current descriptor-flag batch
+
+Modeled `F_GETFD`, `F_SETFD`, `F_DUPFD`, and `F_DUPFD_CLOEXEC`, with
+per-descriptor close-on-exec flags and shared file offsets. Linux Debug,
+Release and ASan+UBSan passed 140/140 tests; selected stateful comparisons
+use private Linux memfds. Windows cross-compiled but not run. There is no
+modeled exec and this is not PS5 or game support.
 
 ## Current file-fixture differential batch
 
