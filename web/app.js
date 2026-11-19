@@ -4,6 +4,7 @@ const KEY = 'nightfall.library.v1';
 let items = [];
 let attached = new Map();
 let current = null;
+let engineAvailable = false;
 try {
   const data = JSON.parse(localStorage.getItem(KEY) || '[]');
   if (Array.isArray(data)) items = data.filter(x => x && typeof x.id === 'string' && typeof x.name === 'string' && typeof x.fileName === 'string' && (x.size === null || Number.isFinite(x.size)));
@@ -39,6 +40,9 @@ function details(id) {
   $('runMode').value=item.fileName.toLowerCase().endsWith('.elf')?'elf':'raw';
   const source=$('sourceLink'); source.hidden=true; source.removeAttribute('href');
   try { const url=new URL(item.source); if(url.protocol==='https:') { source.href=url.href; source.hidden=false; } } catch(_) {}
+  $('runItem').disabled=!engineAvailable;
+  $('runItem').textContent=engineAvailable?'Запустить тест':'Запуск недоступен';
+  $('runNote').textContent=engineAvailable ? 'Поддерживаются только оригинальные небольшие тестовые файлы raw и ELF. Не запускайте неизвестные или защищённые файлы: это не песочница.' : 'В веб-демо запуск программ недоступен. Локальная версия поддерживает только оригинальные тестовые файлы, не игры.';
   $('detailsDialog').showModal();
 }
 for(const id of ['addButton','openAdd','emptyAdd']) $(id).addEventListener('click',()=>{ $('addForm').reset(); $('addDialog').showModal(); });
@@ -77,5 +81,8 @@ $('inputArea').addEventListener('pointerdown',e=>{ e.preventDefault(); $('inputA
 $('inputArea').addEventListener('pointermove',e=>{ if(e.pointerType==='mouse' && document.activeElement===$('inputArea')) $('inputEvent').textContent='Мышь: '+Math.round(e.offsetX)+' × '+Math.round(e.offsetY); });
 $('inputArea').addEventListener('contextmenu',e=>e.preventDefault());
 for(const id of ['helpButton','openAbout']) $(id).addEventListener('click',e=>{ e.preventDefault(); $('aboutDialog').showModal(); });
-fetch('/api/status').then(r=>r.json()).then(s=>{ $('engineStatus').textContent=s.engine==='available'?'Ядро найдено':'Ядро не собрано'; $('engineDot').classList.toggle('off',s.engine!=='available'); }).catch(()=>{ $('engineStatus').textContent='Нет соединения'; $('engineDot').classList.add('off'); });
+fetch('/api/status').then(r=>{ if(!r.ok) throw Error('No local engine'); return r.json(); }).then(s=>{
+  engineAvailable=s.engine==='available'; $('engineStatus').textContent=engineAvailable?'Ядро найдено':'Ядро не собрано';
+  $('engineDot').classList.toggle('off',!engineAvailable); $('webOnlyNotice').hidden=engineAvailable;
+}).catch(()=>{ engineAvailable=false; $('engineStatus').textContent='Веб-демо · без ядра'; $('engineDot').classList.add('off'); $('webOnlyNotice').hidden=false; });
 draw();
