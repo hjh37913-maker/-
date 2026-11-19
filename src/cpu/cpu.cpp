@@ -126,6 +126,42 @@ StepResult Cpu::step(Memory& memory) {
         ++state.rip;
         return b[0] == 0xf4 ? StepResult::halted : StepResult::running;
     }
+    // MOVZX r32/r64, r/m8 or r/m16. 0x40..0x4f REX changes the
+    // byte-register encoding (AH..BH become SPL..DIL), even without REX.W.
+    // Other non-W REX instruction forms remain unsupported.
+    if (b[0]==0x0f || (b[0]>=0x40 && b[0]<=0x4f)) {
+        const bool has_rex=b[0]!=0x0f;
+        const unsigned op_pos=has_rex?1:0;
+        if (has_rex && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        if (b[op_pos]==0x0f) {
+            if (!memory.fetch(state.rip,std::span(b).first(op_pos+2))) return StepResult::memory_fault;
+            const unsigned op=b[op_pos+1];
+            if (op==0xb6 || op==0xb7) {
+                const unsigned modrm_pos=op_pos+2;
+                if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+                const unsigned mod=b[modrm_pos]>>6, low_rm=b[modrm_pos]&7;
+                const std::uint8_t rex=has_rex?b[0]:0;
+                const unsigned reg=((b[modrm_pos]>>3)&7)+((rex&4)?8:0);
+                unsigned length=modrm_pos+1; std::uint64_t value=0;
+                if (mod==3) {
+                    if (op==0xb6 && !has_rex && low_rm>=4)
+                        value=(*state.reg(low_rm-4)>>8)&0xff; // AH/CH/DH/BH
+                    else {
+                        value=*state.reg(low_rm+((rex&1)?8:0));
+                        value &= op==0xb6 ? 0xff : 0xffff;
+                    }
+                } else {
+                    std::uint64_t address=0;
+                    if (!effective_address(memory,state,b,modrm_pos,rex,0,address,length)) return StepResult::memory_fault;
+                    std::array<std::uint8_t,2> data{}; const unsigned width=op==0xb6?1:2;
+                    if (!memory.read(address,std::span(data).first(width))) return StepResult::memory_fault;
+                    value=little(data.data(),width);
+                }
+                *state.reg(reg)=value; state.rip+=length; // r32 writes zero-extend too.
+                return StepResult::running;
+            }
+        }
+    }
     // Near indirect CALL/JMP and PUSH r/m64 (FF /2, /4, /6).
     // Evaluate memory/register operands before changing RSP, including [rsp].
     const bool rex_indirect=b[0]>=0x40 && b[0]<=0x4f;

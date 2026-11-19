@@ -70,3 +70,9 @@ XOR and AND imm8 register forms. Build using the freestanding flags above;
 `./build/nightfall_cli --run-elf examples/logical-immediate-demo.elf 100`
 halts with RAX=42. This original test includes synthetic HLT and must **not**
 be executed directly on the host. It does not exercise OS or PS5 services.
+
+## Zero-extension C fixture
+`movzx-demo.c` is an original freestanding program with an 8-bit read,
+compiled using GCC 12.2 and the flags above. `nightfall_cli --run-elf
+examples/movzx-demo.elf 100` stops at synthetic HLT with RAX=42. **Do not
+execute the ELF on the host**. This does not exercise a console runtime.

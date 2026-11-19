@@ -37,3 +37,9 @@ an assembly-test macro naming collision; after fixing that, four existing
 unsupported-opcode checks failed because their opcodes are now implemented.
 Those checks now use unsupported ADC, preserving the original assertions;
 full regressions passed. This does not add a PS5 ABI or game compatibility.
+
+### Byte and word reads (2026-11-19)
+Implemented the x86 MOVZX byte/word source forms, including REX and high-byte
+register semantics. Native Linux x86-64 comparisons cover memory sources;
+portable checks cover register encodings and faults. This enables an original
+freestanding C byte-read fixture, not PS5 binaries or games.
