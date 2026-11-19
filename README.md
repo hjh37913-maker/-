@@ -32,3 +32,6 @@ python3 web/server.py --cli build/nightfall_cli
 On Windows, after a multi-config Debug build, use `py -3 web\server.py --cli build\Debug\nightfall_cli.exe` (Windows not yet tested). The server binds to loopback by default; **do not expose it to untrusted networks or users**. It has no authentication and the interpreter is not a sandbox. Use only original, trusted test programs.
 
 The Russian-language dashboard can catalogue local file names/sizes or user-provided HTTPS source links, search/remove entries, test browser keyboard/mouse events, and run selected original raw (max 64 KiB) or ELF64 (max 1 MiB) test files through the real CLI. It stores only metadata in browser local storage, not game files; after reload, select the file again. Source links open in the browser; the destination determines whether a download occurs. There is no integrated game store/downloader, rights verification, DRM bypass or support for launching PS5 or GTA VI. Browser keyboard/mouse events are a diagnostic display only and are not forwarded to the guest.
+
+### Experimental downloadable demos
+The Windows x64 native demo and Android UI-only demo are described in [DEMO_BUILDS](docs/DEMO_BUILDS.md). Neither has been runtime-tested on its target platform; neither launches PS5 games. The Android demo does not include the interpreter.

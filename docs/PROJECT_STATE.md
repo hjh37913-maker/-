@@ -90,3 +90,6 @@ Implemented x86-64 near indirect CALL/JMP and PUSH from register or memory, whic
 
 ## Experimental local dashboard
 Implemented a browser-based library of metadata and optional HTTPS source links; it does not copy, install or download games. The dashboard can submit only original trusted raw/ELF test files to the existing CLI and displays its actual output. Keyboard/mouse events are displayed locally in the browser, not sent to guests. Python HTTP integration (six unittest methods, registered as one CTest test) and a simulated-DOM smoke test passed. All 51 CTest cases passed on Linux Debug, Release and ASan/UBSan. UI has not been visually tested in a browser or on Windows. PS5, GTA VI, game downloads and gameplay input remain unsupported.
+
+## Platform demo builds
+Cross-compiled a native Windows x64 GUI demo linked to the actual synthetic CPU core, and packaged a separate optional browser dashboard with the Windows CLI. Built and debug-signed an offline Android WebView **UI-only** APK with no emulator core. PE headers, APK signature, alignment and manifest were checked; Linux CTest passed 51/51 in Debug, Release and ASan/UBSan. Android generated asset offline/disabled-execution checks passed in jsdom. Neither Windows runtime nor Android install/device/browser behavior was tested; no PS5 or GTA VI support. See DEMO_BUILDS.md.
