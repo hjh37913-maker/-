@@ -59,3 +59,11 @@ Environment for these tests: C++20 and CMake, no GPU or guest files. The first f
 
 ## Run the current suite together
 On Linux with GCC or Clang and CMake installed, run `./scripts/verify.sh`; it builds and runs Debug, Release, and ASan/UBSan variants and exits on failure. The six native differential executables are included only on supported Linux x86-64 GCC/Clang. On Windows, `powershell -File scripts/verify.ps1` is provided for Debug and Release with a multi-config MSVC generator; the script and Windows builds have not been tested here. GPU hardware, Windows, real game and future functionality require tests that cannot be completed in this environment.
+
+## Local dashboard tests
+When Python 3 is available, CTest runs `web_server_integration` (six unittest methods) against the actual built CLI. It checks original raw/ELF execution, error propagation, request limits and cross-origin rejection. Separately, a DOM smoke test was run using Node 22 and jsdom 26 (a simulated DOM, not a browser rendering or physical-device test):
+```sh
+npm install --prefix /tmp/nightfall-ui-test jsdom@26 --no-audit --no-fund
+NODE_PATH=/tmp/nightfall-ui-test/node_modules node tests/web/ui_smoke.cjs
+```
+The first Release run of the server integration test encountered a BrokenPipe race while sending an oversized body that the server correctly rejected early. The size preflight test was corrected to send headers without a body, and Debug, Release and ASan/UBSan suites all passed afterward. No existing assertions were removed. UI behavior on Windows and in a real browser was not verified.

@@ -1,6 +1,6 @@
 # NIGHTFALL
 
-An early-stage, research-only PS5 emulation project. **No PS5 binaries, games, or GTA VI can run.** The CLI runs a hard-coded synthetic x86-64 sequence by default and can also run bounded original raw-byte test programs; it is not a game launcher. See [project state](docs/PROJECT_STATE.md) and [limitations](docs/KNOWN_LIMITATIONS.md).
+An early-stage, research-only PS5 emulation project. **No PS5 binaries, games, or GTA VI can run.** The CLI runs a hard-coded synthetic x86-64 sequence by default and can also run bounded original raw-byte test programs; it is not a game launcher. An optional local research dashboard can catalogue file metadata and run original test programs; it cannot run games. See [project state](docs/PROJECT_STATE.md) and [limitations](docs/KNOWN_LIMITATIONS.md).
 
 ## Build and run
 Install CMake 3.20+ and a C++20 compiler (on Windows: Visual Studio 2022 with Desktop development with C++, plus CMake). From a developer command prompt:
@@ -19,3 +19,16 @@ A fixed guest byte array with experimental byte-granular mappings and R/W/X acce
 
 ### Execution diagnostics
 For `--run-raw` and `--run-elf`, the CLI reports attempted instruction count and stopping RIP. On invalid instruction or memory fault it also shows up to 15 execute-accessible bytes at the stop RIP. The bytes are not a disassembly; a memory fault may be from a data access rather than instruction fetch, and the data address is not currently reported. `examples/unsupported-demo.bin` demonstrates the failure path. These modes are limited to original unprotected test programs and are not a sandbox or a PS5 game launcher.
+
+### Local research dashboard
+
+Requires Python 3.10+ as well as the C++ build above. From the project root:
+
+```sh
+python3 web/server.py --cli build/nightfall_cli
+# Open http://127.0.0.1:8765 in a browser on the same machine.
+```
+
+On Windows, after a multi-config Debug build, use `py -3 web\server.py --cli build\Debug\nightfall_cli.exe` (Windows not yet tested). The server binds to loopback by default; **do not expose it to untrusted networks or users**. It has no authentication and the interpreter is not a sandbox. Use only original, trusted test programs.
+
+The Russian-language dashboard can catalogue local file names/sizes or user-provided HTTPS source links, search/remove entries, test browser keyboard/mouse events, and run selected original raw (max 64 KiB) or ELF64 (max 1 MiB) test files through the real CLI. It stores only metadata in browser local storage, not game files; after reload, select the file again. Source links open in the browser; the destination determines whether a download occurs. There is no integrated game store/downloader, rights verification, DRM bypass or support for launching PS5 or GTA VI. Browser keyboard/mouse events are a diagnostic display only and are not forwarded to the guest.

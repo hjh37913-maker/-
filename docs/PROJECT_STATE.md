@@ -9,14 +9,15 @@
 | CPU | TESTED, narrowly | 16 GPRs; register MOV/ADD/SUB/CMP, selected MOV memory, immediate and branch forms; native differential tests cover selected cases, not exhaustive |
 | Memory | TESTED, narrowly | Fixed-capacity, byte-granular experimental map/protect/unmap, R/W/X checks and counts; not a console memory model |
 | Storage | TESTED, narrowly | Synchronous bounded host-file ranges and CRC-32; 40 checks, no PS5 compatibility |
-| Input | TESTED, narrowly | Synthetic digital input mapper; no physical devices or guest input |
+| Input | TESTED, narrowly | Core synthetic mapper; browser keyboard/mouse diagnostic only, no guest input |
 | Graphics experiment | TESTED, narrowly | CPU-only clear/fill/copy surface; no GPU or PS5 compatibility |
 | ELF64 test loader | TESTED, narrowly | Loads a restricted original x86-64 ELF64 fixture, not PS5 binaries |
 | Runtime experiment | TESTED, narrowly | Deterministic standalone timer queue; no guest ABI or host scheduler |
 | GPU, shader translation | NOT_IMPLEMENTED | No compatibility implementation |
-| UI / performance telemetry | NOT_IMPLEMENTED | CLI reports synthetic result only |
+| UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
+| Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows untested |
-| Coverage | Measured, limited | 50 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
+| Coverage | Measured, limited | 51 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
 ## Continuation priorities
@@ -86,3 +87,6 @@ Implemented `81 /0,/5,/7` ADD/SUB/CMP with imm32 for unprefixed 32-bit and REX.W
 
 ## Current execution foundation batch
 Implemented x86-64 near indirect CALL/JMP and PUSH from register or memory, which enables an original freestanding C function-pointer fixture to halt with RAX=42. Added bounded machine/CLI diagnostics with attempted count, stop RIP and execute-accessible bytes for faults. 6,144 portable register scenarios plus memory, address and fault tests cover indirect operations; these are not native differential tests. All 50 CTest tests passed in Linux Debug, Release and ASan/UBSan. Original fixture is not a game or PS5 executable. No OS ABI, console loader, GPU, Windows validation or game launch exists.
+
+## Experimental local dashboard
+Implemented a browser-based library of metadata and optional HTTPS source links; it does not copy, install or download games. The dashboard can submit only original trusted raw/ELF test files to the existing CLI and displays its actual output. Keyboard/mouse events are displayed locally in the browser, not sent to guests. Python HTTP integration (six unittest methods, registered as one CTest test) and a simulated-DOM smoke test passed. All 51 CTest cases passed on Linux Debug, Release and ASan/UBSan. UI has not been visually tested in a browser or on Windows. PS5, GTA VI, game downloads and gameplay input remain unsupported.

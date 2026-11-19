@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#141414"><title>NIGHTFALL — ваша библиотека</title><link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="#library" aria-label="Nightfall, библиотека"><span class="brand-mark">N<span>✦</span></span><span>NIGHTFALL<small>RESEARCH PROJECT</small></span></a>
+    <div class="sidebar-label">ПРОСТРАНСТВО</div>
+    <nav aria-label="Основная навигация">
+      <a class="nav-link active" href="#library"><span>▦</span> Библиотека <i>01</i></a>
+      <a class="nav-link" href="#controls"><span>⌘</span> Управление</a>
+      <a class="nav-link" href="#about"><span>◈</span> О проекте</a>
+    </nav>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-card"><div class="status-dot"></div><div><b>Ранний прототип</b><p>Совместимость с PS5<br>в разработке</p></div></div>
+    <div class="sidebar-bottom"><span>NF / 01</span><span>BUILD 0.1</span></div>
+  </aside>
+  <main class="main" id="library">
+    <header class="topbar"><div class="breadcrumb">NIGHTFALL <span>/</span> <b>БИБЛИОТЕКА</b></div><div class="top-right"><span class="engine-status"><i id="engineDot"></i><span id="engineStatus">Проверяем ядро</span></span><button class="icon-button" id="helpButton" title="О проекте" aria-label="О проекте">?</button><div class="avatar">N</div></div></header>
+    <div class="content">
+      <div class="page-heading"><div><div class="eyebrow"><span></span> ВАШЕ ПРОСТРАНСТВО</div><h1>Библиотека<span>.</span></h1><p>Всё, что важно, в одном месте.</p></div><button id="addButton" class="button primary"><span>＋</span> Добавить файл</button></div>
+      <section class="hero" aria-label="О проекте"><img src="/assets/nightfall-hero.jpg" alt=""><div class="hero-shade"></div><div class="hero-content"><div class="hero-label"><span class="spark">✦</span> THE NEXT FRONTIER <span class="rule"></span> 001</div><h2>Всё начинается<br><em>с первого шага.</em></h2><p>NIGHTFALL — исследовательский проект. Собирайте свою библиотеку и следите за развитием совместимости.</p><a href="#about" class="hero-link">Узнать о проекте <span>↗</span></a></div><div class="hero-caption"><span>EXPLORE THE UNKNOWN</span><span>01 / 03</span></div></section>
+      <div class="notice"><span class="notice-icon">!</span><p><b>Пока это не игровой лаунчер.</b> Добавление файла не означает, что его можно запустить. PS5 и GTA VI ещё не поддерживаются.</p><a href="#about">Подробнее ↗</a></div>
+      <section class="library-section"><div class="section-top"><div><div class="eyebrow"><span></span> ВАША КОЛЛЕКЦИЯ</div><h3>Библиотека <span id="itemCount">00</span></h3></div><div class="library-tools"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Поиск в библиотеке" aria-label="Поиск в библиотеке"></label><button class="small-button" id="openAdd">＋ <span>Добавить</span></button></div></div>
+        <div id="empty" class="empty"><div class="empty-icon">▦<span>✦</span></div><h4>Здесь пока тихо</h4><p>Добавьте файл в библиотеку, чтобы он<br>появился здесь. Начнём с малого.</p><button class="button secondary" id="emptyAdd">＋ &nbsp; Добавить первый файл</button><div class="empty-index">YOUR LIBRARY / 000</div></div><div class="cards" id="cards"></div><div class="no-results" id="noResults" hidden>Ничего не найдено. Попробуйте другой запрос.</div>
+      </section>
+      <section class="bottom-grid"><div class="info-card" id="controls"><div class="card-heading"><span class="little-icon">⌘</span><span class="pill">БРАУЗЕРНЫЙ ТЕСТ</span></div><h4>Играйте по-своему.</h4><p>Проверьте клавиатуру и мышь без контроллера. Передача управления в игры ещё не реализована.</p><button id="openControls" class="text-link">Проверить управление <span>↗</span></button></div><div class="info-card" id="about"><div class="card-heading"><span class="little-icon">◈</span><span class="pill">В РАЗРАБОТКЕ</span></div><h4>Один шаг за раз.</h4><p>Мы строим основу для эмуляции. Сейчас доступны только оригинальные тестовые программы, не игры PS5.</p><a href="#projectDetails" id="openAbout" class="text-link">Что уже работает <span>↗</span></a></div></section>
+      <footer><div><b>NIGHTFALL</b> <span>© RESEARCH PROJECT</span></div><span>СДЕЛАНО ДЛЯ ИССЛЕДОВАНИЙ &nbsp; ✦</span></footer>
+    </div>
+  </main>
+</div>
+<dialog id="addDialog"><form id="addForm"><div class="dialog-top"><div><div class="eyebrow"><span></span> БИБЛИОТЕКА</div><h3>Добавить файл</h3></div><button type="button" class="close" data-close aria-label="Закрыть">×</button></div><p>Выберите локальный файл или укажите HTTPS-ссылку на источник. Сохраняются только сведения о файле и ссылка; сам файл не копируется.</p><label class="field">Файл <span class="optional">необязательно, если есть ссылка</span><input type="file" id="fileInput"></label><label class="field">Название <input type="text" id="titleInput" maxlength="120" placeholder="По умолчанию — имя файла"></label><label class="field">Ссылка на источник <span class="optional">необязательно · только HTTPS</span><input type="url" id="sourceInput" placeholder="https://example.com"></label><div class="dialog-actions"><button type="button" class="button ghost" data-close>Отмена</button><button class="button primary" type="submit">Добавить в библиотеку</button></div></form></dialog>
+<dialog id="detailsDialog"><div class="dialog-top"><div><div class="eyebrow"><span></span> ЭЛЕМЕНТ БИБЛИОТЕКИ</div><h3 id="detailTitle"></h3></div><button type="button" class="close" data-close aria-label="Закрыть">×</button></div><p id="detailMeta"></p><p class="dialog-note">Поддерживаются только оригинальные небольшие тестовые файлы raw и ELF. Не запускайте неизвестные или защищённые файлы: это не песочница.</p><label class="field">Режим тестовой программы <select id="runMode"><option value="elf">ELF64 — до 1 МиБ</option><option value="raw">Raw — до 64 КиБ</option></select></label><div id="reattachArea" hidden><label class="field">Выбрать файл заново <input type="file" id="reattach"></label></div><a id="sourceLink" class="source-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Открыть источник / скачать ↗</a><label class="consent"><input type="checkbox" id="runConsent"> Это мой оригинальный тестовый файл; я понимаю, что это не песочница.</label><pre id="runOutput" hidden></pre><div class="dialog-actions"><button id="removeItem" class="button ghost danger">Удалить запись</button><button id="runItem" class="button primary">Запустить тест</button></div></dialog>
+<dialog id="controlsDialog"><div class="dialog-top"><div><div class="eyebrow"><span></span> УСТРОЙСТВА ВВОДА</div><h3>Клавиатура и мышь</h3></div><button type="button" class="close" data-close aria-label="Закрыть">×</button></div><p>Нажмите клавиши или кнопки мыши в области ниже. Это проверка браузера, не управление игрой.</p><div id="inputArea" class="input-area" tabindex="0"><span>⌨ &nbsp; Нажмите здесь и попробуйте</span><b id="inputEvent">Ожидание ввода</b><small>Esc — закрыть · движения мыши отслеживаются внутри области</small></div><p class="dialog-note">Ввод пока не передаётся в эмулятор или игры. Поддержка гостевого управления — отдельная будущая задача.</p></dialog>
+<dialog id="aboutDialog"><div class="dialog-top"><div><div class="eyebrow"><span></span> ПРОЕКТ</div><h3>В процессе создания.</h3></div><button type="button" class="close" data-close aria-label="Закрыть">×</button></div><p>NIGHTFALL — ранний исследовательский прототип. Добавление в библиотеку не подтверждает совместимость, а настоящих загрузчика PS5, системной среды и GPU пока нет.</p><p class="dialog-note">Загрузка из магазинов, обход защиты, запуск GTA VI и управление в играх не реализованы. Используйте только файлы, на которые у вас есть права.</p><button class="button secondary" data-close>Понятно</button></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/app.js" defer></script>
+</body></html>
