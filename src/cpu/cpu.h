@@ -5,7 +5,7 @@
 namespace nightfall {
 // A syscall trap leaves CPU state untouched; a host runtime must explicitly
 // handle or reject it. No host system call is invoked by the CPU interpreter.
-enum class StepResult { running, halted, syscall_trap, invalid_instruction, memory_fault };
+enum class StepResult { running, halted, syscall_trap, invalid_instruction, memory_fault, divide_error };
 struct CpuState {
     std::uint64_t rax = 0;
     // Encoded register indices: 0=RAX, 1=RCX, 2=RDX, 3=RBX,

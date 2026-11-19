@@ -24,13 +24,14 @@ const char* name(nightfall::RunResult result) {
     case nightfall::RunResult::syscall_trap: return "syscall_trap";
     case nightfall::RunResult::invalid_instruction: return "invalid_instruction";
     case nightfall::RunResult::memory_fault: return "memory_fault";
+    case nightfall::RunResult::divide_error: return "divide_error";
     case nightfall::RunResult::budget_exhausted: return "budget_exhausted";
     }
     return "unknown";
 }
 void diagnostic(const nightfall::RunReport& report) {
     std::cout << "Instructions attempted=" << report.attempted << " stop RIP=" << report.stop_rip << '\n';
-    if (report.result==nightfall::RunResult::memory_fault || report.result==nightfall::RunResult::invalid_instruction) {
+    if (report.result==nightfall::RunResult::memory_fault || report.result==nightfall::RunResult::invalid_instruction || report.result==nightfall::RunResult::divide_error) {
         std::cout << "Bytes accessible at stop RIP (not decoded; memory fault may be data access):";
         if (!report.fault_byte_count) std::cout << " unavailable";
         for (std::size_t i=0;i<report.fault_byte_count;++i)
@@ -83,6 +84,20 @@ int elf(const char* path,std::size_t budget,bool sparse=false) {
     return result==nightfall::RunResult::halted?0:1;
 }
 
+const char* process_name(nightfall::runtime::ProcessResult result) {
+    using nightfall::runtime::ProcessResult;
+    switch (result) {
+    case ProcessResult::exited: return "exited";
+    case ProcessResult::halted: return "halted";
+    case ProcessResult::invalid_instruction: return "invalid_instruction";
+    case ProcessResult::memory_fault: return "memory_fault";
+    case ProcessResult::budget_exhausted: return "budget_exhausted";
+    case ProcessResult::already_exited: return "already_exited";
+    case ProcessResult::divide_error: return "divide_error";
+    }
+    return "unknown";
+}
+
 int linux_elf(const char* path,std::size_t budget,std::span<const std::string> args,bool read_stdin) {
     constexpr std::uint64_t virtual_size=1ULL<<44;
     constexpr std::size_t stack_size=65536, image_limit=1024*1024, max_pages=4096;
@@ -124,7 +139,7 @@ int linux_elf(const char* path,std::size_t budget,std::span<const std::string> a
     std::cerr << "\nExperimental Linux test ABI: instructions=" << report.attempted << " stop RIP=" << report.stop_rip
               << "; PS5 software and GTA VI are not supported.\n";
     if(report.result==nightfall::runtime::ProcessResult::exited) return report.exit_code;
-    std::cerr << "Test program did not exit via supported syscall; result=" << static_cast<int>(report.result) << '\n';
+    std::cerr << "Test program did not exit via supported syscall; result=" << process_name(report.result) << '\n';
     return 1;
 }
 

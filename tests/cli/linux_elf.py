@@ -4,7 +4,7 @@ import platform
 import subprocess
 import sys
 
-cli, hello, args, synthetic, echo, heap, writev, readv, multiply = sys.argv[1:]
+cli, hello, args, synthetic, echo, heap, writev, readv, multiply, divide, divide_fault = sys.argv[1:]
 def guest(file, budget='100', *argv):
     return subprocess.run([cli, '--run-linux-elf', file, budget, *argv], capture_output=True)
 q=guest(hello)
@@ -45,6 +45,18 @@ assert q.returncode==0 and q.stdout==b'Multiply OK\n', (q.returncode,q.stdout,q.
 if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
     native=subprocess.run([multiply],capture_output=True)
     assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+q=guest(divide)
+assert q.returncode==0 and q.stdout==b'Divide OK\n', (q.returncode,q.stdout,q.stderr)
+if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
+    native=subprocess.run([divide],capture_output=True)
+    assert (q.returncode,q.stdout)==(native.returncode,native.stdout)
+q=guest(divide_fault)
+assert q.returncode==1 and b'did not exit' in q.stderr and b'divide_error' in q.stderr and not q.stdout
+if sys.platform.startswith('linux') and platform.machine().lower() in ('x86_64','amd64'):
+    import resource, signal
+    def no_core(): resource.setrlimit(resource.RLIMIT_CORE,(0,0))
+    native=subprocess.run([divide_fault],capture_output=True,preexec_fn=no_core)
+    assert native.returncode==-signal.SIGFPE and not native.stdout
 q=guest(hello,'1')
 assert q.returncode==1 and b'did not exit' in q.stderr
 q=guest(synthetic)

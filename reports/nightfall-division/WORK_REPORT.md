@@ -1,0 +1,9 @@
+# Work block: division, fault propagation and byte swapping
+
+- Started 2026-11-19 14:42:20 UTC; development and checks continued through 14:57:20 UTC or later.
+- Added 8/16/32/64-bit DIV and IDIV register/memory forms, explicit modeled divide_error on division by zero or quotient overflow, propagation through Machine and the bounded Linux test runtime, and 32/64-bit BSWAP. Undefined divide flags are preserved; the Linux test runtime does not deliver signals to the guest. Staged operands preserve CPU state on faults. The 64-bit wide division algorithm does not require nonportable 128-bit integers.
+- Added two original Linux ELF fixtures: a safe division program and an intentional zero-divide fixture. The latter was executed on the host only in an isolated child, with core dumps disabled, and produced expected SIGFPE; the guest reports divide_error.
+- Final Linux GCC Debug, Release and ASan+UBSan builds each passed 111/111 CTest tests. A separate final clean Release build also passed 111/111.
+- Selected native tests: 98,491 successful divisions compared against native CPU, 163,653 errors checked by an independent integer reference, 16 isolated native SIGFPE cases, 131,072 BSWAP comparisons. An explicit exhaustive byte-divisor run covered 12,566,273 successful native comparisons and 20,988,159 independently classified errors. These are instruction-specific tests, not proof of general CPU or game compatibility.
+- Measured a checked high-half-zero host-division fast path in a narrow synthetic benchmark; timings, limitations and possible high-half-nonzero cost are recorded in docs/PERFORMANCE.md. No game performance inference.
+- Windows x64 CLI and portable divide/BSWAP tests cross-compiled with Zig; Windows runtime not tested. A mistyped compiler flag in the first parallel test command failed; the corrected commands succeeded. No PS5/GTA VI software, protected packages or DRM were involved.

@@ -53,3 +53,14 @@ a 320×180 RGBA8 buffer and rasterized one clipped flat-color triangle for
 single sample taken while a separate CPU soak test was running, so it is not a
 controlled performance comparison. It is CPU-only, excludes depth, GPU,
 shaders and console workloads, and is not a game frame-rate estimate.
+
+## Synthetic CPU division fast path
+Linux x86-64 GCC 12.2 Release, three unpinned sequential samples of 500,000
+interpreted unsigned 64-bit DIV operations per sample, resetting the guest
+registers for each operation; checksums agreed before/after. For zero upper
+half the long-division baseline took 75.2–77.5 ms and a checked host-division
+fast path took 30.3–32.0 ms. For upper half equal to one (long-division path),
+baseline took 81.4–82.3 ms and after took 85.3–88.6 ms. These are small,
+non-interleaved synthetic samples subject to noise; they do not establish a
+workload-wide improvement and are not Windows, PS5 or game performance.
+`cpu_div_benchmark` is available with `NIGHTFALL_BUILD_BENCHMARKS=ON`.

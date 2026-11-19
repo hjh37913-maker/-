@@ -118,3 +118,39 @@ Portable tests additionally cover selected instruction/permission faults,
 RIP-relative addressing, REX extensions and register aliases. An original
 static Linux test ELF checks multiplication, sign extension, output and exit
 against native execution. Windows was cross-compiled, not executed.
+
+## Division and byte-order experiment
+
+`F6 /6,/7` and `F7 /6,/7` implement unsigned DIV and signed IDIV of
+register/memory operands in 8, 16, 32 and 64 bits. Signed quotient truncates
+toward zero and the remainder follows the dividend's sign. Byte results go to
+AL/AH; word results preserve upper RAX/RDX; dword results zero-extend.
+Operands are staged before writes, including divisor aliases of accumulator
+registers. Division by zero or quotient overflow yields `divide_error`,
+leaving RIP, registers and flags unchanged; instruction/data read faults are
+`memory_fault`. DIV/IDIV flags are architecturally undefined; this model
+preserves them. The machine and Linux test runtime propagate the modeled
+error, but they do **not** deliver CPU exceptions or Linux signals to a guest.
+
+The implementation uses unsigned long division for wide dividends, avoiding
+nonportable 128-bit host integers, with a checked host-division fast path when
+the upper dividend half is zero. The nonzero divisor is checked first, and
+that path's quotient necessarily fits the unsigned host width. Operand-size
+prefix plus REX.W and the `66 F6` byte form are rejected; other redundant
+prefixes are not a full x86 prefix decoder.
+
+`0F C8..CF` and REX forms implement BSWAP r32/r64, preserving flags and
+zero-extending 32-bit writes. Operand-size-override BSWAP is not implemented.
+
+Native Linux x86-64 tests compare 98,491 successful DIV/IDIV cases against
+actual CPU instructions and classify 163,653 selected divide errors using an
+independent 128-bit integer reference. Sixteen deliberate native zero/overflow
+cases run in isolated children with core dumps disabled and are checked for
+SIGFPE. An optional exhaustive byte test covers every AX/divisor combination:
+12,566,273 successes compared with native execution and 20,988,159 faults
+classified with a separate bounded integer reference. Native BSWAP comparison
+covers 131,072 inputs. These counts are test cases, not CPU completeness.
+The source registers and memory forms exercised by guest tests may be compared
+against equivalent native memory operands, not identical address encodings.
+A self-authored Linux ELF exercises successful division; a separate explicit
+fault fixture is run only under the model or an isolated native child.

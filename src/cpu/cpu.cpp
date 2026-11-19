@@ -118,6 +118,39 @@ void group_logical64(CpuState& state, std::uint64_t& dst, std::uint64_t rhs, uns
     if (extension==1) dst|=rhs; else if (extension==4) dst&=rhs; else dst^=rhs;
     logical_test(state,dst);
 }
+// Divide a 2*width-bit dividend by a width-bit divisor using unsigned
+// long division. Quotients that don't fit width bits are reported, never
+// executed as host divide instructions. This works on compilers without
+// a 128-bit integer type, including Windows toolchains.
+bool divide_value(std::uint64_t hi,std::uint64_t lo,std::uint64_t divisor,
+                  unsigned width,bool is_signed,std::uint64_t& quotient,std::uint64_t& remainder) {
+    const auto mask=width==64?~std::uint64_t{0}:(std::uint64_t{1}<<width)-1;
+    const auto sign=std::uint64_t{1}<<(width-1);
+    hi&=mask; lo&=mask; divisor&=mask;
+    if (!divisor) return false;
+    const bool neg_dividend=is_signed && (hi&sign);
+    const bool neg_divisor=is_signed && (divisor&sign);
+    if (neg_dividend) { lo=(~lo+1)&mask; hi=(~hi+(lo==0))&mask; }
+    if (neg_divisor) divisor=(~divisor+1)&mask;
+    if (hi>=divisor) return false;
+    auto rem=hi; std::uint64_t q=0;
+    if (!hi) {
+        // Divisor is nonzero; the unsigned width-bit dividend guarantees
+        // the host quotient fits. This also covers sign-extended small values.
+        q=lo/divisor; rem=lo%divisor;
+    } else {
+        for (unsigned bit=width;bit>0;--bit) {
+            const bool carry=rem&sign;
+            rem=((rem<<1)|((lo>>(bit-1))&1))&mask;
+            if (carry || rem>=divisor) { rem=(rem-divisor)&mask; q|=std::uint64_t{1}<<(bit-1); }
+        }
+    }
+    const bool neg_quotient=neg_dividend!=neg_divisor;
+    if (is_signed && q>(neg_quotient?sign:sign-1)) return false;
+    quotient=neg_quotient?((~q+1)&mask):q;
+    remainder=neg_dividend?((~rem+1)&mask):rem;
+    return true;
+}
 // Portable upper half of a 64x64 unsigned product using 32-bit limbs.
 std::uint64_t multiply_high64(std::uint64_t a,std::uint64_t b) {
     const auto a0=std::uint64_t{static_cast<std::uint32_t>(a)}, a1=a>>32;
@@ -175,6 +208,21 @@ StepResult Cpu::step(Memory& memory) {
         ++state.rip;
         return b[0] == 0xf4 ? StepResult::halted : StepResult::running;
     }
+    // BSWAP r32/r64 (0F C8..CF); REX.B extends the encoded register.
+    if (b[0]==0x0f || (b[0]>=0x40 && b[0]<=0x4f)) {
+        const bool has_rex=b[0]!=0x0f;
+        const auto rex=has_rex?b[0]:std::uint8_t{0}; const unsigned pos=has_rex?1:0;
+        if (!memory.fetch(state.rip,std::span(b).first(pos+1))) return StepResult::memory_fault;
+        if (b[pos]==0x0f) {
+            if (!memory.fetch(state.rip,std::span(b).first(pos+2))) return StepResult::memory_fault;
+            if (b[pos+1]>=0xc8 && b[pos+1]<=0xcf) {
+                const unsigned reg=b[pos+1]-0xc8+((rex&1)?8:0), bytes=(rex&8)?8:4;
+                auto value=*state.reg(reg); std::uint64_t result=0;
+                for(unsigned i=0;i<bytes;++i) { result=(result<<8)|(value&0xff); value>>=8; }
+                *state.reg(reg)=result; state.rip+=pos+2; return StepResult::running;
+            }
+        }
+    }
     // CBW, CWDE and CDQE: sign-extend accumulator into the next size.
     if (b[0]==0x98) { state.rax=static_cast<std::uint32_t>(sign_extend(state.rax&0xffff,16)); ++state.rip; return StepResult::running; }
     if (b[0]==0x66 || b[0]==0x48) {
@@ -195,6 +243,43 @@ StepResult Cpu::step(Memory& memory) {
     if (b[0]==0x66) {
         if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
         if (b[1]==0x99) { auto& rdx=*state.reg(2); rdx=(rdx&~0xffffULL)|((state.rax&0x8000)?0xffffULL:0); state.rip+=2; return StepResult::running; }
+    }
+    // DIV/IDIV r/m8, r/m16, r/m32 and r/m64. #DE is reported explicitly;
+    // no guest divide can trigger a host division trap or mutate state on fault.
+    if (b[0]==0xf6 || b[0]==0xf7 || b[0]==0x66 || (b[0]>=0x40 && b[0]<=0x4f)) {
+        const bool word=b[0]==0x66; unsigned pos=word?1:0;
+        if (word && !memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
+        const bool has_rex=b[pos]>=0x40 && b[pos]<=0x4f;
+        const auto rex=has_rex?b[pos]:std::uint8_t{0};
+        if (has_rex) { ++pos; if (!memory.fetch(state.rip,std::span(b).first(pos+1))) return StepResult::memory_fault; }
+        if (b[pos]==0xf6 || b[pos]==0xf7) {
+            const bool byte=b[pos]==0xf6;
+            const unsigned modrm_pos=pos+1;
+            if (!memory.fetch(state.rip,std::span(b).first(modrm_pos+1))) return StepResult::memory_fault;
+            const unsigned ext=(b[modrm_pos]>>3)&7;
+            if (ext==6 || ext==7) {
+                if (word && (byte || (rex&8))) return StepResult::invalid_instruction;
+                const unsigned width=byte?8:word?16:(rex&8)?64:32;
+                const auto mask=width==64?~std::uint64_t{0}:(std::uint64_t{1}<<width)-1;
+                const unsigned mod=b[modrm_pos]>>6, low_rm=b[modrm_pos]&7;
+                std::uint64_t divisor=0; unsigned length=modrm_pos+1;
+                if (mod==3) divisor=byte && !has_rex && low_rm>=4?(*state.reg(low_rm-4)>>8)&0xff:*state.reg(low_rm+((rex&1)?8:0))&mask;
+                else {
+                    std::uint64_t address=0; std::array<std::uint8_t,8> value{};
+                    if (!effective_address(memory,state,b,modrm_pos,rex,0,address,length) || !memory.read(address,std::span(value).first(width/8))) return StepResult::memory_fault;
+                    divisor=little(value.data(),width/8);
+                }
+                const auto lo=state.rax&mask;
+                const auto hi=byte?(state.rax>>8)&0xff:*state.reg(2)&mask;
+                std::uint64_t q=0,r=0;
+                if (!divide_value(hi,lo,divisor,width,ext==7,q,r)) return StepResult::divide_error;
+                if (byte) state.rax=(state.rax&~0xffffULL)|(r<<8)|q;
+                else if (word) { state.rax=(state.rax&~mask)|q; auto& rdx=*state.reg(2); rdx=(rdx&~mask)|r; }
+                else { state.rax=q; *state.reg(2)=r; }
+                // Arithmetic flags are undefined after DIV/IDIV and preserved in this model.
+                state.rip+=length; return StepResult::running;
+            }
+        }
     }
     // Byte MUL/IMUL: AL times r/m8, full product in AX. REX changes
     // encodings 4..7 from AH..BH to SPL..DIL.

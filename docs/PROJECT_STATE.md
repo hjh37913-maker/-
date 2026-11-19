@@ -17,8 +17,16 @@
 | UI | Implemented experimentally | Browser-local metadata library, browser input diagnostic, and real synthetic CLI test runner; not a game launcher |
 | Performance telemetry | NOT_IMPLEMENTED | No real-game telemetry |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows x64 cross-compiled, runtime untested |
-| Coverage | Measured, limited | 106 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
+| Coverage | Measured, limited | 111 registered CTest cases on Linux x86-64; older gcov measurements in COVERAGE.md are not current or a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
+
+## Latest CPU division batch
+
+Added selected DIV/IDIV byte through qword forms, `divide_error` propagation,
+and BSWAP; Linux Debug, Release and ASan+UBSan passed 111/111 CTest cases.
+Selected native CPU results and isolated native fault signals were compared;
+Windows was cross-compiled but not run. The modeled Linux runtime does not
+deliver guest SIGFPE. See CPU_ARCHITECTURE.md for exact scope.
 
 ## Latest CPU multiplication batch
 

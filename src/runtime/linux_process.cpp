@@ -179,7 +179,7 @@ ProcessReport LinuxProcess::run(std::size_t budget) {
             r.result=ProcessResult::exited; r.exit_code=exit_code_; r.stop_rip=before; return r;
         }
         r.stop_rip=before;
-        r.result=step==StepResult::halted?ProcessResult::halted:step==StepResult::invalid_instruction?ProcessResult::invalid_instruction:ProcessResult::memory_fault;
+        r.result=step==StepResult::halted?ProcessResult::halted:step==StepResult::invalid_instruction?ProcessResult::invalid_instruction:step==StepResult::divide_error?ProcessResult::divide_error:ProcessResult::memory_fault;
         return r;
     }
     r.stop_rip=machine_.cpu.state.rip; return r;
