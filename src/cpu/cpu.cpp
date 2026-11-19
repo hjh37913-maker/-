@@ -286,53 +286,81 @@ StepResult Cpu::step(Memory& memory) {
         return StepResult::running;
     }
     const auto opcode=b[1];
+    if (opcode==0xc7) { // MOV r/m64, sign-extended imm32
+        if (!memory.fetch(state.rip,std::span(b).first(3))) return StepResult::memory_fault;
+        if ((b[2]&0x38)!=0) return StepResult::invalid_instruction;
+        if ((b[2]>>6)==3) {
+            if (!memory.fetch(state.rip,std::span(b).first(7))) return StepResult::memory_fault;
+            *state.reg((b[2]&7)+((b[0]&1)?8:0))=sign_extend(little(b.data()+3,4),32);
+            state.rip+=7; return StepResult::running;
+        }
+        std::uint64_t address=0; unsigned length=0;
+        if (!effective_address(memory,state,b,2,b[0],4,address,length)) return StepResult::memory_fault;
+        if (!memory.write(address,bytes64(sign_extend(little(b.data()+length-4,4),32)))) return StepResult::memory_fault;
+        state.rip+=length; return StepResult::running;
+    }
     if (opcode==0x83) { // REX.W group 1: ADD/SUB/CMP r64, sign-extended imm8
         if (!memory.fetch(state.rip,std::span(b).first(3))) return StepResult::memory_fault;
         const auto mod=b[2]>>6, extension=(b[2]>>3)&7;
-        if (mod!=3 || (extension!=0 && extension!=5 && extension!=7)) return StepResult::invalid_instruction;
+        if (extension!=0 && extension!=5 && extension!=7) return StepResult::invalid_instruction;
+        if (mod!=3) {
+            std::uint64_t address=0; unsigned length=0;
+            if (!effective_address(memory,state,b,2,b[0],1,address,length)) return StepResult::memory_fault;
+            std::array<std::uint8_t,8> bytes{};
+            if (!memory.read(address,bytes)) return StepResult::memory_fault;
+            auto next=state; auto value=little(bytes.data(),8);
+            arithmetic(next,value,sign_extend(b[length-1],8),extension!=0,extension==7);
+            if (extension!=7 && !memory.write(address,bytes64(value))) return StepResult::memory_fault;
+            state=next; state.rip+=length; return StepResult::running;
+        }
         if (!memory.fetch(state.rip,std::span(b).first(4))) return StepResult::memory_fault;
         const unsigned reg=(b[2]&7)+((b[0]&1)?8:0);
         arithmetic(state,*state.reg(reg),sign_extend(b[3],8),extension!=0,extension==7);
         state.rip+=4;
         return StepResult::running;
     }
-    if (opcode==0x85) { // TEST r/m64, r64 (register-direct form only)
-        if (!memory.fetch(state.rip,std::span(b).first(3))) return StepResult::memory_fault;
-        if ((b[2]&0xc0)!=0xc0) return StepResult::invalid_instruction;
-        const unsigned reg=((b[2]>>3)&7)+((b[0]&4)?8:0);
-        const unsigned rm=(b[2]&7)+((b[0]&1)?8:0);
-        logical_test(state,*state.reg(reg) & *state.reg(rm));
-        state.rip+=3;
-        return StepResult::running;
-    }
     if (opcode==0x89 || opcode==0x8b || opcode==0x8d || opcode==0x01 || opcode==0x03 ||
-        opcode==0x29 || opcode==0x2b || opcode==0x31 || opcode==0x33 || opcode==0x39 || opcode==0x3b) {
+        opcode==0x29 || opcode==0x2b || opcode==0x31 || opcode==0x33 || opcode==0x39 || opcode==0x3b || opcode==0x85) {
         if (!memory.fetch(state.rip, std::span(b).first(3))) return StepResult::memory_fault;
         const unsigned mod=b[2]>>6;
         const unsigned reg=((b[2]>>3)&7) + ((b[0]&4) ? 8 : 0);
         const unsigned low_rm=b[2]&7;
         const unsigned rm=low_rm + ((b[0]&1) ? 8 : 0);
         if (mod!=3) {
-            // MOV memory and LEA with base, optional SIB, and signed displacement.
-            if (opcode!=0x89 && opcode!=0x8b && opcode!=0x8d) return StepResult::invalid_instruction;
+            // Base/SIB/RIP-relative data operands, with staged fault behavior.
             unsigned length=0; std::uint64_t address=0;
             if (!effective_address(memory,state,b,2,b[0],0,address,length)) return StepResult::memory_fault;
             if (opcode==0x8d) { // LEA computes an address without accessing it.
                 *state.reg(reg)=address; state.rip+=length; return StepResult::running;
             }
-            std::array<std::uint8_t,8> bytes{};
-            if (opcode==0x8b) {
-                if (!memory.read(address,bytes)) return StepResult::memory_fault;
-                *state.reg(reg)=little(bytes.data(),8);
+            if (opcode==0x89) {
+                if (!memory.write(address,bytes64(*state.reg(reg)))) return StepResult::memory_fault;
             } else {
-                const auto value=*state.reg(reg);
-                for (unsigned i=0;i<8;++i) bytes[i]=static_cast<std::uint8_t>(value>>(8*i));
-                if (!memory.write(address,bytes)) return StepResult::memory_fault;
+                std::array<std::uint8_t,8> bytes{};
+                if (!memory.read(address,bytes)) return StepResult::memory_fault;
+                const auto value=little(bytes.data(),8);
+                if (opcode==0x8b) *state.reg(reg)=value;
+                else if (opcode==0x85) logical_test(state,value & *state.reg(reg));
+                else {
+                    const bool to_reg=opcode==0x03 || opcode==0x2b || opcode==0x33 || opcode==0x3b;
+                    const bool compare=opcode==0x39 || opcode==0x3b;
+                    const auto rhs=to_reg ? value : *state.reg(reg);
+                    auto next=state; auto dst=to_reg ? *state.reg(reg) : value;
+                    if (opcode==0x31 || opcode==0x33) { dst^=rhs; logical_test(next,dst); }
+                    else arithmetic(next,dst,rhs,opcode==0x29 || opcode==0x2b || compare,compare);
+                    if (!to_reg && !compare && !memory.write(address,bytes64(dst))) return StepResult::memory_fault;
+                    if (to_reg && !compare) *next.reg(reg)=dst;
+                    state=next;
+                }
             }
             state.rip+=length;
             return StepResult::running;
         }
         if (opcode==0x8d) return StepResult::invalid_instruction; // LEA requires memory form
+        if (opcode==0x85) {
+            logical_test(state,*state.reg(reg) & *state.reg(rm));
+            state.rip+=3; return StepResult::running;
+        }
         const bool to_reg=opcode==0x8b || opcode==0x03 || opcode==0x2b || opcode==0x33 || opcode==0x3b;
         auto& dst=*state.reg(to_reg ? reg : rm);
         const auto src=*state.reg(to_reg ? rm : reg);

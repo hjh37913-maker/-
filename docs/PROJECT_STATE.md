@@ -16,7 +16,7 @@
 | GPU, shader translation | NOT_IMPLEMENTED | No compatibility implementation |
 | UI / performance telemetry | NOT_IMPLEMENTED | CLI reports synthetic result only |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows untested |
-| Coverage | Measured, limited | 40 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
+| Coverage | Measured, limited | 43 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
 ## Continuation priorities
@@ -75,5 +75,8 @@ Added unprefixed 32-bit MOV loads/stores, immediate stores, LEA and a shared eff
 ## Current 32-bit memory arithmetic batch
 Implemented selected unprefixed 32-bit ADD/SUB/CMP/TEST memory forms, including signed imm8 operations. 29,440 portable memory-vs-register cross-checks exercise results and flags, with permission and fault checks; this is not an independent native differential test. The original C fixture uses explicit inline assembly to exercise memory arithmetic and halts with RAX=42. All 37 CTest cases passed on Linux Debug, Release and ASan/UBSan. Windows and PS5/GTA VI remain untested.
 
-## Current XOR and native memory differential batch
+## Previous XOR and native memory differential batch
 Implemented unprefixed 32-bit XOR register and memory forms, and REX.W 64-bit register XOR. A GCC 12.2 freestanding C XOR fixture executes to synthetic HLT with RAX=42. Independent Linux x86-64 native differential tests cover 36,864 32-bit memory/register ADD/SUB/CMP/TEST/XOR cases, 4,096 32-bit XOR register cases, and 8,192 64-bit XOR register cases; imm8 memory forms are not covered by that native oracle. All 40 CTest cases passed in Linux Debug, Release, and ASan/UBSan. No Windows or PS5/GTA VI execution was tested.
+
+## Current 64-bit memory arithmetic batch
+Implemented selected REX.W 64-bit ADD/SUB/CMP/XOR/TEST register-memory forms, sign-extended imm8 ADD/SUB/CMP and sign-extended imm32 MOV to memory/register. The original C fixture uses explicit inline assembly and halts with RAX=42. A native Linux x86-64 oracle passed 36,864 memory register-operand cases; 768 memory-immediate cases compare to the existing interpreter register form, not native. Permission, truncated-instruction, alias, extended-register and fault checks also passed. All 43 CTest cases passed on Linux in Debug, Release and ASan/UBSan. Windows and PS5/GTA VI remain untested.

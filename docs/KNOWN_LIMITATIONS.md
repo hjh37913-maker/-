@@ -9,6 +9,6 @@ The graphics experiment is CPU-only; it does not implement alpha blending, shade
 
 The experimental logical timer queue is not a PS5 timer, guest service, host clock, scheduler or threading implementation; its ordering and clock units are project-defined.
 
-The raw-test CLI accepts host files but is not a file sandbox or a PS5/PE loader; do not feed it untrusted files. Only a small subset of stack and memory MOV forms exists; 64-bit arithmetic memory operands and indirect calls remain unimplemented; 32-bit arithmetic memory support is limited to selected unprefixed forms.
+The raw-test CLI accepts host files but is not a file sandbox or a PS5/PE loader; do not feed it untrusted files. Only a small subset of stack and memory MOV forms exists; indirect calls remain unimplemented; 32- and 64-bit arithmetic memory support is limited to selected forms. Read-modify-write is not host-atomic and LOCK is unsupported.
 
 The restricted ELF64 loader is for original x86-64 test executables only. It lacks dynamic linking, relocations, process startup, syscalls, TLS and operating-system isolation; acceptance is not proof of program compatibility.

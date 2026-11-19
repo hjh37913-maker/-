@@ -45,3 +45,6 @@ The C compiler and linker versions or flags may generate different instructions 
 
 ## XOR C fixture
 `xor-demo.c` uses ordinary C XOR and is compiled with GCC 12.2 and the freestanding flags shown above. Run `./build/nightfall_cli --run-elf examples/xor-demo.elf 100`; expected RAX=42. It uses the synthetic HLT sentinel: **do not execute the ELF directly on the host**. This is not a console or operating-system program.
+
+## 64-bit memory arithmetic fixture
+`memory64-demo.c` uses explicit inline x86 assembly for 64-bit memory ADD/SUB/CMP; GCC 12.2 generates an additional sign-extended MOV immediate. Build with the same freestanding flags as above. `./build/nightfall_cli --run-elf examples/memory64-demo.elf 100` halts with RAX=42. The ELF uses the synthetic HLT sentinel: **do not execute directly on the host**. No OS or PS5 interface is involved.

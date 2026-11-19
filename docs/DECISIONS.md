@@ -36,3 +36,5 @@
 2026-11-19 continuation: Added selected unprefixed 32-bit memory arithmetic forms with staged CPU state for write faults. This models single-threaded instruction outcomes only: read-modify-write is not host-atomic and LOCK is not supported. Cross-checks against register forms are not independent native differential tests.
 
 2026-11-19 continuation: Implemented 32-bit register/memory XOR and 64-bit register XOR, preserving undefined AF consistently with TEST. No LOCK or 64-bit XOR memory form. Added an independent native oracle for selected 32-bit memory register-operand arithmetic (not memory immediate forms), and both 32- and 64-bit register XOR. No change to synthetic HLT or console support.
+
+2026-11-19 continuation: Implemented selected REX.W memory arithmetic/TEST/XOR, imm8 memory arithmetic, and MOV sign-extended imm32. State and flags are staged before guest-memory writes; this is not a host-atomic RMW or a model of LOCK. Memory immediate cases were cross-checked with interpreter register forms, not independent native execution.

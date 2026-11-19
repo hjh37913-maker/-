@@ -19,10 +19,10 @@ int main() {
         }
     }
     for (auto op : {0x01,0x03,0x29,0x2b,0x39,0x3b}) {
-        // Arithmetic memory operands are intentionally unsupported.
+        // Out-of-range arithmetic memory operands must fault without changing state.
         const std::array<std::uint8_t,3> memop{0x48,static_cast<std::uint8_t>(op),0x00};
         Memory m(3); CHECK(m.write(0,memop)); Cpu t; t.state.rax=42; t.state.rflags=0x402;
-        CHECK(t.step(m)==StepResult::invalid_instruction && t.state.rip==0 && t.state.rax==42 && t.state.rflags==0x402);
+        CHECK(t.step(m)==StepResult::memory_fault && t.state.rip==0 && t.state.rax==42 && t.state.rflags==0x402);
         Memory truncated(2); CHECK(truncated.write(0,std::span(memop).first(2))); Cpu u;
         CHECK(u.step(truncated)==StepResult::memory_fault && u.state.rip==0);
     }

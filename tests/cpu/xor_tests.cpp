@@ -16,6 +16,6 @@ int main() {
       CHECK(c.step(m)==StepResult::memory_fault && c.state.rip==0 && c.state.rax==0x1234 && c.state.rflags==0x812);
       std::array<std::uint8_t,4> result{}; CHECK(m.read(32,result) && result==data); }
     { Memory m(3); Cpu c; const std::array<std::uint8_t,3> code{0x48,0x31,0x03}; CHECK(m.write(0,code));
-      CHECK(c.step(m)==StepResult::invalid_instruction && c.state.rip==0); }
+      CHECK(c.step(m)==StepResult::memory_fault && c.state.rip==0); }
     std::cout << "portable XOR cases passed\n";
 }
