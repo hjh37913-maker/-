@@ -48,3 +48,6 @@ The C compiler and linker versions or flags may generate different instructions 
 
 ## 64-bit memory arithmetic fixture
 `memory64-demo.c` uses explicit inline x86 assembly for 64-bit memory ADD/SUB/CMP; GCC 12.2 generates an additional sign-extended MOV immediate. Build with the same freestanding flags as above. `./build/nightfall_cli --run-elf examples/memory64-demo.elf 100` halts with RAX=42. The ELF uses the synthetic HLT sentinel: **do not execute directly on the host**. No OS or PS5 interface is involved.
+
+## Immediate-32 group arithmetic fixture
+`imm32-demo.c` uses explicit inline assembly for 64-bit memory arithmetic with values too large for imm8, compiled with GCC 12.2 using the freestanding flags above. `./build/nightfall_cli --run-elf examples/imm32-demo.elf 100` halts with RAX=42. It uses synthetic HLT: **do not execute directly on the host**. No OS or console interface is exercised.

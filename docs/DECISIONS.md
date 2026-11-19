@@ -38,3 +38,5 @@
 2026-11-19 continuation: Implemented 32-bit register/memory XOR and 64-bit register XOR, preserving undefined AF consistently with TEST. No LOCK or 64-bit XOR memory form. Added an independent native oracle for selected 32-bit memory register-operand arithmetic (not memory immediate forms), and both 32- and 64-bit register XOR. No change to synthetic HLT or console support.
 
 2026-11-19 continuation: Implemented selected REX.W memory arithmetic/TEST/XOR, imm8 memory arithmetic, and MOV sign-extended imm32. State and flags are staged before guest-memory writes; this is not a host-atomic RMW or a model of LOCK. Memory immediate cases were cross-checked with interpreter register forms, not independent native execution.
+
+2026-11-19 continuation: Added group-1 imm32 ADD/SUB/CMP in selected 32- and 64-bit register/memory forms. The 64-bit immediate is sign-extended. Memory writes remain staged and are not host-atomic. The 24,576-case oracle uses equivalent native register arithmetic, not hardware execution of identical guest bytes.

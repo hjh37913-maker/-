@@ -193,15 +193,15 @@ StepResult Cpu::step(Memory& memory) {
     }
     // Selected unprefixed 32-bit register and memory forms.
     const auto op32=b[0];
-    if (op32==0x83 || op32==0x85 || op32==0x89 || op32==0x8b || op32==0x8d || op32==0xc7 || op32==0x01 || op32==0x03 ||
+    if (op32==0x81 || op32==0x83 || op32==0x85 || op32==0x89 || op32==0x8b || op32==0x8d || op32==0xc7 || op32==0x01 || op32==0x03 ||
         op32==0x29 || op32==0x2b || op32==0x31 || op32==0x33 || op32==0x39 || op32==0x3b) {
         if (!memory.fetch(state.rip,std::span(b).first(2))) return StepResult::memory_fault;
         const unsigned mod=b[1]>>6, reg=(b[1]>>3)&7, rm=b[1]&7;
         if (mod!=3) {
             if ((op32==0xc7 && reg!=0) ||
-                (op32==0x83 && reg!=0 && reg!=5 && reg!=7)) return StepResult::invalid_instruction;
+                ((op32==0x81 || op32==0x83) && reg!=0 && reg!=5 && reg!=7)) return StepResult::invalid_instruction;
             std::uint64_t address=0; unsigned length=0;
-            const unsigned trailing=op32==0xc7?4:(op32==0x83?1:0);
+            const unsigned trailing=(op32==0xc7 || op32==0x81)?4:(op32==0x83?1:0);
             if (!effective_address(memory,state,b,1,0,trailing,address,length)) return StepResult::memory_fault;
             if (op32==0x8d) *state.reg(reg)=static_cast<std::uint32_t>(address);
             else if (op32==0x89 || op32==0xc7) {
@@ -217,9 +217,10 @@ StepResult Cpu::step(Memory& memory) {
                 else if (op32==0x85) logical_test32(state,value & static_cast<std::uint32_t>(*state.reg(reg)));
                 else {
                     const bool to_reg=op32==0x03 || op32==0x2b || op32==0x33 || op32==0x3b;
-                    const bool compare=op32==0x39 || op32==0x3b || (op32==0x83 && reg==7);
-                    const bool subtract=op32==0x29 || op32==0x2b || compare || (op32==0x83 && reg==5);
-                    const auto rhs=op32==0x83 ? static_cast<std::uint32_t>(sign_extend(b[length-1],8)) :
+                    const bool compare=op32==0x39 || op32==0x3b || ((op32==0x81 || op32==0x83) && reg==7);
+                    const bool subtract=op32==0x29 || op32==0x2b || compare || ((op32==0x81 || op32==0x83) && reg==5);
+                    const auto rhs=op32==0x81 ? static_cast<std::uint32_t>(little(b.data()+length-4,4)) :
+                                   op32==0x83 ? static_cast<std::uint32_t>(sign_extend(b[length-1],8)) :
                                    to_reg ? value : static_cast<std::uint32_t>(*state.reg(reg));
                     // Stage flags and result so a failed write does not change CPU state.
                     auto next=state;
@@ -244,11 +245,13 @@ StepResult Cpu::step(Memory& memory) {
             if (!memory.fetch(state.rip,std::span(b).first(6))) return StepResult::memory_fault;
             *state.reg(rm)=little(b.data()+2,4); state.rip+=6; return StepResult::running;
         }
-        if (op32==0x83) {
+        if (op32==0x81 || op32==0x83) {
             if (reg!=0 && reg!=5 && reg!=7) return StepResult::invalid_instruction;
-            if (!memory.fetch(state.rip,std::span(b).first(3))) return StepResult::memory_fault;
-            arithmetic32(state,*state.reg(rm),static_cast<std::uint32_t>(sign_extend(b[2],8)),reg!=0,reg==7);
-            state.rip+=3; return StepResult::running;
+            const unsigned width=op32==0x81?4:1, length=2+width;
+            if (!memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
+            const auto imm=little(b.data()+2,width);
+            arithmetic32(state,*state.reg(rm),static_cast<std::uint32_t>(width==1?sign_extend(imm,8):imm),reg!=0,reg==7);
+            state.rip+=length; return StepResult::running;
         }
         if (op32==0x85) {
             logical_test32(state,static_cast<std::uint32_t>(*state.reg(reg)) & static_cast<std::uint32_t>(*state.reg(rm)));
@@ -299,24 +302,26 @@ StepResult Cpu::step(Memory& memory) {
         if (!memory.write(address,bytes64(sign_extend(little(b.data()+length-4,4),32)))) return StepResult::memory_fault;
         state.rip+=length; return StepResult::running;
     }
-    if (opcode==0x83) { // REX.W group 1: ADD/SUB/CMP r64, sign-extended imm8
+    if (opcode==0x81 || opcode==0x83) { // REX.W group 1, sign-extended immediate
         if (!memory.fetch(state.rip,std::span(b).first(3))) return StepResult::memory_fault;
         const auto mod=b[2]>>6, extension=(b[2]>>3)&7;
         if (extension!=0 && extension!=5 && extension!=7) return StepResult::invalid_instruction;
+        const unsigned width=opcode==0x81?4:1;
         if (mod!=3) {
             std::uint64_t address=0; unsigned length=0;
-            if (!effective_address(memory,state,b,2,b[0],1,address,length)) return StepResult::memory_fault;
+            if (!effective_address(memory,state,b,2,b[0],width,address,length)) return StepResult::memory_fault;
             std::array<std::uint8_t,8> bytes{};
             if (!memory.read(address,bytes)) return StepResult::memory_fault;
             auto next=state; auto value=little(bytes.data(),8);
-            arithmetic(next,value,sign_extend(b[length-1],8),extension!=0,extension==7);
+            arithmetic(next,value,sign_extend(little(b.data()+length-width,width),width*8),extension!=0,extension==7);
             if (extension!=7 && !memory.write(address,bytes64(value))) return StepResult::memory_fault;
             state=next; state.rip+=length; return StepResult::running;
         }
-        if (!memory.fetch(state.rip,std::span(b).first(4))) return StepResult::memory_fault;
+        const unsigned length=3+width;
+        if (!memory.fetch(state.rip,std::span(b).first(length))) return StepResult::memory_fault;
         const unsigned reg=(b[2]&7)+((b[0]&1)?8:0);
-        arithmetic(state,*state.reg(reg),sign_extend(b[3],8),extension!=0,extension==7);
-        state.rip+=4;
+        arithmetic(state,*state.reg(reg),sign_extend(little(b.data()+3,width),width*8),extension!=0,extension==7);
+        state.rip+=length;
         return StepResult::running;
     }
     if (opcode==0x89 || opcode==0x8b || opcode==0x8d || opcode==0x01 || opcode==0x03 ||

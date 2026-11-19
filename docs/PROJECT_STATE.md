@@ -16,7 +16,7 @@
 | GPU, shader translation | NOT_IMPLEMENTED | No compatibility implementation |
 | UI / performance telemetry | NOT_IMPLEMENTED | CLI reports synthetic result only |
 | Build | TESTED | Linux GCC Debug, Release and sanitizer builds; Windows untested |
-| Coverage | Measured, limited | 43 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
+| Coverage | Measured, limited | 46 registered CTest cases on Linux x86-64; gcov measurements in COVERAGE.md, not a feature-completeness metric |
 | GTA VI | NOT_IMPLEMENTED | No loader, guest OS, graphics, legitimate delivery path, or game execution test |
 
 ## Continuation priorities
@@ -78,5 +78,8 @@ Implemented selected unprefixed 32-bit ADD/SUB/CMP/TEST memory forms, including 
 ## Previous XOR and native memory differential batch
 Implemented unprefixed 32-bit XOR register and memory forms, and REX.W 64-bit register XOR. A GCC 12.2 freestanding C XOR fixture executes to synthetic HLT with RAX=42. Independent Linux x86-64 native differential tests cover 36,864 32-bit memory/register ADD/SUB/CMP/TEST/XOR cases, 4,096 32-bit XOR register cases, and 8,192 64-bit XOR register cases; imm8 memory forms are not covered by that native oracle. All 40 CTest cases passed in Linux Debug, Release, and ASan/UBSan. No Windows or PS5/GTA VI execution was tested.
 
-## Current 64-bit memory arithmetic batch
+## Previous 64-bit memory arithmetic batch
 Implemented selected REX.W 64-bit ADD/SUB/CMP/XOR/TEST register-memory forms, sign-extended imm8 ADD/SUB/CMP and sign-extended imm32 MOV to memory/register. The original C fixture uses explicit inline assembly and halts with RAX=42. A native Linux x86-64 oracle passed 36,864 memory register-operand cases; 768 memory-immediate cases compare to the existing interpreter register form, not native. Permission, truncated-instruction, alias, extended-register and fault checks also passed. All 43 CTest cases passed on Linux in Debug, Release and ASan/UBSan. Windows and PS5/GTA VI remain untested.
+
+## Current 5k+ scenario batch: imm32 group 1
+Implemented `81 /0,/5,/7` ADD/SUB/CMP with imm32 for unprefixed 32-bit and REX.W 64-bit register and memory forms, including 64-bit sign extension. 24,576 native-arithmetic comparisons cover these forms and varied operands; the native oracle uses equivalent register arithmetic rather than the same immediate instruction encoding. Portable tests cover permissions, truncated instructions, unsupported groups and RIP-relative addressing. An original GCC C fixture with explicit inline assembly halted at RAX=42. The new test initially had a temporary-array `span` compile error, corrected before verification. All 46 CTest tests passed in Linux Debug, Release and combined ASan/UBSan. Windows, PS5 and GTA VI remain untested. Scenario count is not a count of independent subsystems.
